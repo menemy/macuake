@@ -1,0 +1,32 @@
+name: Macuake
+options:
+  bundleIdPrefix: com.macuake
+  deploymentTarget:
+    macOS: "14.0"
+
+targets:
+  Macuake:
+    type: application
+    platform: macOS
+    sources: []
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.macuake.terminal
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        PRODUCT_NAME: Macuake
+        SWIFT_VERSION: "5.0"
+
+  MacuakeUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: MacuakeUITests
+    dependencies:
+      - target: Macuake
+    settings:
+      base:
+        TEST_TARGET_NAME: Macuake
+        PRODUCT_BUNDLE_IDENTIFIER: com.macuake.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"

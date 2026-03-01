@@ -1,0 +1,175 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: Macuake
+  BUNDLE_ID: com.maquake.app
+
+jobs:
+  build-and-release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: brew install zig
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version $VERSION"
+
+      - name: Build GhosttyKit
+        run: ./scripts/build-ghostty.sh
+
+      - name: Build universal release binary
+        run: swift build -c release --arch arm64 --arch x86_64
+
+      - name: Prepare app bundle
+        run: |
+          APP_BUNDLE="build/${{ env.APP_NAME }}.app"
+
+          # Create bundle structure
+          mkdir -p "$APP_BUNDLE/Contents/MacOS"
+          mkdir -p "$APP_BUNDLE/Contents/Frameworks"
+          mkdir -p "$APP_BUNDLE/Contents/Resources"
+
+          # Update version in Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.version.outputs.version }}" \
+            MaQuake/Resources/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" \
+            MaQuake/Resources/Info.plist
+
+          # Copy binary (universal path)
+          cp .build/apple/Products/Release/${{ env.APP_NAME }} "$APP_BUNDLE/Contents/MacOS/${{ env.APP_NAME }}"
+
+          # Copy Info.plist and resources
+          cp MaQuake/Resources/Info.plist "$APP_BUNDLE/Contents/Info.plist"
+          cp MaQuake/Resources/maquake.icns "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
+
+          # Embed Sparkle.framework
+          SPARKLE_SRC=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+          cp -R "$SPARKLE_SRC" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+
+          # Add rpath for embedded frameworks
+          install_name_tool -add_rpath "@executable_path/../Frameworks" \
+            "$APP_BUNDLE/Contents/MacOS/${{ env.APP_NAME }}" 2>/dev/null || true
+
+      - name: Import signing certificate
+        env:
+          CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          echo "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
+
+      - name: Sign app bundle (inside-out)
+        run: |
+          APP_BUNDLE="build/${{ env.APP_NAME }}.app"
+          IDENTITY="${{ secrets.SIGNING_IDENTITY }}"
+          ENTITLEMENTS="MaQuake/Resources/MaQuake.entitlements"
+
+          # Sign Sparkle XPC services and helpers first (inside-out)
+          codesign --force --sign "$IDENTITY" --options runtime \
+            "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc"
+          codesign --force --sign "$IDENTITY" --options runtime \
+            "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc"
+          codesign --force --sign "$IDENTITY" --options runtime \
+            "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"
+          codesign --force --sign "$IDENTITY" --options runtime \
+            "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app"
+          codesign --force --sign "$IDENTITY" --options runtime \
+            "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+
+          # Sign main app bundle
+          codesign --force --sign "$IDENTITY" \
+            --options runtime \
+            --entitlements "$ENTITLEMENTS" \
+            "$APP_BUNDLE"
+
+          codesign --verify --deep --strict "$APP_BUNDLE"
+
+      - name: Create DMG
+        run: |
+          hdiutil create -volname "${{ env.APP_NAME }}" \
+            -srcfolder "build/${{ env.APP_NAME }}.app" \
+            -ov -format UDZO \
+            "build/${{ env.APP_NAME }}.dmg"
+          codesign --force --sign "${{ secrets.SIGNING_IDENTITY }}" \
+            "build/${{ env.APP_NAME }}.dmg"
+
+      - name: Notarize DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          xcrun notarytool submit "build/${{ env.APP_NAME }}.dmg" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "build/${{ env.APP_NAME }}.dmg"
+
+      - name: Sign update with Sparkle
+        env:
+          SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          SPARKLE_BIN=".build/artifacts/sparkle/Sparkle/bin"
+          echo "$SPARKLE_KEY" > "$RUNNER_TEMP/sparkle_key"
+          "$SPARKLE_BIN/sign_update" "build/${{ env.APP_NAME }}.dmg" -f "$RUNNER_TEMP/sparkle_key"
+          rm "$RUNNER_TEMP/sparkle_key"
+
+      - name: Generate appcast
+        env:
+          SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          SPARKLE_BIN=".build/artifacts/sparkle/Sparkle/bin"
+          echo "$SPARKLE_KEY" > "$RUNNER_TEMP/sparkle_key"
+
+          mkdir -p /tmp/appcast_dir
+          cp "build/${{ env.APP_NAME }}.dmg" /tmp/appcast_dir/
+
+          "$SPARKLE_BIN/generate_appcast" \
+            --ed-key-file "$RUNNER_TEMP/sparkle_key" \
+            --download-url-prefix "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/" \
+            /tmp/appcast_dir
+
+          rm "$RUNNER_TEMP/sparkle_key"
+          cp /tmp/appcast_dir/appcast.xml build/appcast.xml
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/${{ env.APP_NAME }}.dmg
+            build/appcast.xml
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}

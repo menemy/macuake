@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>macuake</title>
+    <link>https://macuake.com/appcast.xml</link>
+    <description>macuake update feed</description>
+    <language>en</language>
+    <!--
+      To publish an update:
+      1. Build universal release: scripts/build-install.sh
+      2. Create a zip: cd build && zip -r Macuake.zip Macuake.app
+      3. Sign with Sparkle: sparkle/bin/sign_update Macuake.zip
+      4. Add <item> below with version, sparkle:edSignature, and length
+      5. Upload Macuake.zip to GitHub Release
+      6. Push this file to update the feed
+    -->
+  </channel>
+</rss>
