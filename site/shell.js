@@ -508,6 +508,74 @@ window.MQ_SHELL = {
       return;
     }
 
+    if (cmd === 'impulse' && parts[1] === '9') {
+      terminal.writeln(G + W + 'ALL WEAPONS AND KEYS ADDED' + N);
+      terminal.writeln(D + 'armor: ' + G + '200' + N);
+      terminal.writeln(D + 'nails: ' + G + '200' + N);
+      terminal.writeln(D + 'rockets: ' + G + '100' + N);
+      terminal.writeln(Y + 'You are ready to frag.' + N);
+      return;
+    }
+
+    if (cmd === 'coffee') {
+      terminal.writeln('');
+      terminal.writeln(Y + '       ( (' + N);
+      terminal.writeln(Y + '        ) )' + N);
+      terminal.writeln(D + '     ........' + N);
+      terminal.writeln(D + '     |      |]' + N);
+      terminal.writeln(D + '     \\      /' + N);
+      terminal.writeln(D + '      `----\'' + N);
+      terminal.writeln(R + '  HTTP 418: I\'m a teapot.' + N);
+      return;
+    }
+
+    if (cmd === 'history') {
+      terminal.writeln(D + '    1  ' + N + 'sudo rm -rf /var/log');
+      terminal.writeln(D + '    2  ' + N + 'git push --force origin main');
+      terminal.writeln(D + '    3  ' + N + 'google "how to undo git push force"');
+      terminal.writeln(D + '    4  ' + N + 'google "cheap flights to mexico"');
+      terminal.writeln(D + '    5  ' + N + 'history');
+      return;
+    }
+
+    if (cmd === 'kill') {
+      if (input.includes('$$')) {
+        terminal.writeln(D + 'Terminal terminated...' + N);
+        terminal.writeln(G + 'Just kidding. You can\'t kill a DOM element that easily.' + N);
+      } else {
+        terminal.writeln(R + 'kill: no process found' + N);
+      }
+      return;
+    }
+
+    if (cmd === 'bofh') {
+      const excuses = [
+        'solar flares affecting the server room',
+        'stray alpha particles from memory packaging',
+        'the network is being reconfigured to support RFC 2549',
+        'someone tripped over the ethernet cable again',
+        'cosmic rays flipped a bit in production',
+        'the hamster powering the server took a break',
+        'DNS propagation (it\'s always DNS)',
+        'the intern pushed to main on Friday at 5pm',
+      ];
+      terminal.writeln(R + 'EXCUSE: ' + N + excuses[Math.floor(Math.random() * excuses.length)]);
+      return;
+    }
+
+    if (cmd === 'whereami') {
+      terminal.writeln(D + 'You are in a maze of twisty little passages, all alike.' + N);
+      return;
+    }
+
+    if (cmd === 'cargo' || cmd === 'rustc') {
+      terminal.writeln(D + 'error[E0308]: mismatched types' + N);
+      terminal.writeln(D + '  --> demo.rs:1:1' + N);
+      terminal.writeln(R + '  | expected `real_terminal`, found `web_demo`' + N);
+      terminal.writeln(D + 'For more info, try ' + C + 'rustc --explain E0308' + N);
+      return;
+    }
+
     // ── macuake CLI commands ──
 
     if (cmd === 'macuake') {
