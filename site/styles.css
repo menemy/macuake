@@ -357,28 +357,24 @@ h1.hero-title {
 }
 .install-code .comment { color: var(--muted); }
 
-/* ── Why / Compare ── */
+/* ── Why ── */
 .why { padding: 0 0 80px; }
-.compare-table { max-width: 700px; margin: 0 auto; }
-.compare-header, .compare-row {
-  display: grid; grid-template-columns: 1.5fr repeat(3, 1fr); gap: 0;
-  align-items: center;
+.why-sub {
+  text-align: center; color: var(--muted); font-size: 17px; line-height: 1.6;
+  max-width: 600px; margin: 0 auto 48px;
 }
-.compare-header {
-  border-bottom: 1px solid var(--line); padding: 12px 0;
-  font-weight: 600; font-size: 14px;
+.why-cards {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+  max-width: 900px; margin: 0 auto;
 }
-.compare-header .compare-col { text-align: center; }
-.compare-header .compare-col:first-of-type { color: var(--accent); }
-.compare-row {
-  border-bottom: 1px solid rgba(255,255,255,.04); padding: 14px 0;
-  font-size: 14px;
+.why-card {
+  padding: 32px; border-radius: 16px;
+  background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+  text-align: center;
 }
-.compare-label { color: var(--muted); }
-.compare-col { text-align: center; }
-.compare-col.yes { color: var(--accent); font-weight: 600; }
-.compare-col.partial { color: var(--muted); font-size: 12px; }
-.compare-col.no { color: #636366; }
+.why-icon { font-size: 32px; margin-bottom: 16px; }
+.why-card h4 { font-size: 18px; font-weight: 600; margin: 0 0 10px; }
+.why-card p { font-size: 15px; color: var(--muted); line-height: 1.6; margin: 0; }
 
 /* ── FAQ ── */
 .faq { padding: 0 0 120px; }
@@ -461,10 +457,13 @@ footer a { color: var(--accent); text-decoration: none; }
   .install { padding: 60px 0 80px; }
   .install-code { padding: 16px 18px; font-size: 12px; overflow-x: auto; }
 
-  /* Compare / FAQ */
+  /* Why / FAQ */
   .why { padding: 0 0 60px; }
-  .compare-header, .compare-row { font-size: 12px; padding: 10px 0; }
-  .compare-label { font-size: 12px; }
+  .why-sub { font-size: 15px; margin-bottom: 32px; }
+  .why-cards { grid-template-columns: 1fr; gap: 14px; }
+  .why-card { padding: 24px; }
+  .why-card h4 { font-size: 16px; }
+  .why-card p { font-size: 14px; }
   .faq { padding: 0 0 80px; }
   .faq-item summary { font-size: 14px; padding: 14px 0; }
   .faq-item p { font-size: 13px; }
