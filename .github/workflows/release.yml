@@ -41,7 +41,7 @@ jobs:
         run: ./scripts/download-ghosttykit.sh
 
       - name: Build release binary
-        run: swift build -c release
+        run: swift build -c release --arch arm64 --arch x86_64
 
       - name: Prepare app bundle
         run: |
@@ -58,23 +58,19 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" \
             MaQuake/Resources/Info.plist
 
-          # Copy binary
-          cp .build/release/${{ env.APP_NAME }} "$APP_BUNDLE/Contents/MacOS/${{ env.APP_NAME }}" 2>/dev/null \
-            || cp .build/arm64-apple-macosx/release/${{ env.APP_NAME }} "$APP_BUNDLE/Contents/MacOS/${{ env.APP_NAME }}"
+          # Copy binary (universal build outputs to .build/apple/Products/Release/)
+          cp .build/apple/Products/Release/${{ env.APP_NAME }} "$APP_BUNDLE/Contents/MacOS/${{ env.APP_NAME }}"
 
           # Copy Info.plist and icon
           cp MaQuake/Resources/Info.plist "$APP_BUNDLE/Contents/Info.plist"
           cp MaQuake/Resources/maquake.icns "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
 
-          # Copy SPM resource bundles that have valid Info.plist (codesign-compatible)
-          for dir in .build/release .build/arm64-apple-macosx/release .build/apple/Products/Release; do
-              for bundle in "$dir"/*.bundle; do
-                  [ -d "$bundle" ] || continue
-                  [ -f "$bundle/Info.plist" ] || [ -f "$bundle/Contents/Info.plist" ] || continue
-                  name="$(basename "$bundle")"
-                  cp -R "$bundle" "$APP_BUNDLE/Contents/Resources/$name"
-                  cp -R "$bundle" "$APP_BUNDLE/Contents/MacOS/$name"
-              done
+          # Copy SPM resource bundles (universal build accessor checks Contents/Resources/)
+          for bundle in .build/apple/Products/Release/*.bundle; do
+              [ -d "$bundle" ] || continue
+              [ -f "$bundle/Info.plist" ] || [ -f "$bundle/Contents/Info.plist" ] || continue
+              name="$(basename "$bundle")"
+              cp -R "$bundle" "$APP_BUNDLE/Contents/Resources/$name"
           done
 
           # Embed Sparkle.framework
@@ -117,8 +113,8 @@ jobs:
           IDENTITY="${{ secrets.SIGNING_IDENTITY }}"
           ENTITLEMENTS="MaQuake/Resources/MaQuake.entitlements"
 
-          # Sign resource bundles in MacOS/ first
-          for bundle in "$APP_BUNDLE"/Contents/MacOS/*.bundle; do
+          # Sign resource bundles in Resources/
+          for bundle in "$APP_BUNDLE"/Contents/Resources/*.bundle; do
               [ -d "$bundle" ] || continue
               codesign --force --sign "$IDENTITY" "$bundle"
           done
