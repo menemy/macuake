@@ -20,9 +20,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install dependencies
-        run: brew install zig
-
       - name: Extract version from tag
         id: version
         run: |
@@ -30,7 +27,23 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version $VERSION"
 
-      - name: Build GhosttyKit
+      - name: Get Ghostty submodule SHA
+        id: ghostty-sha
+        run: echo "sha=$(git -C vendor/ghostty rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache GhosttyKit.xcframework
+        id: cache-ghostty
+        uses: actions/cache@v4
+        with:
+          path: vendor/ghostty/macos/GhosttyKit.xcframework
+          key: ghosttykit-${{ runner.arch }}-${{ steps.ghostty-sha.outputs.sha }}
+
+      - name: Install zig (cache miss only)
+        if: steps.cache-ghostty.outputs.cache-hit != 'true'
+        run: brew install zig
+
+      - name: Build GhosttyKit (cache miss only)
+        if: steps.cache-ghostty.outputs.cache-hit != 'true'
         run: ./scripts/build-ghostty.sh
 
       - name: Build universal release binary
