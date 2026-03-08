@@ -163,6 +163,79 @@ window.MQ_SHELL = {
 
     // ── Easter eggs ──
 
+    if (cmd === 'claude') {
+      const M = '\x1b[38;2;194;101;74m'; // Claude orange
+      terminal.writeln('');
+      terminal.writeln(M + ' \u2590\u259B\u2588\u2588\u2588\u259C\u258C' + N + '   ' + W + 'Claude Code' + N + ' ' + D + 'v2.1.71' + N);
+      terminal.writeln(M + '\u259D\u259C\u2588\u2588\u2588\u2588\u2588\u259B\u2598' + N + '  ' + D + 'Opus 4.6 with extended thinking' + N);
+      terminal.writeln(M + '  \u2598\u2598 \u259D\u259D' + N + '    ' + D + '~/Projects/macuake' + N);
+      terminal.writeln('');
+      const scenarios = [
+        // Rate limit
+        () => {
+          terminal.writeln(C + '>' + N + ' ' + W + 'refactor the entire codebase to Rust' + N);
+          terminal.writeln('');
+          terminal.writeln(D + '  Thinking...' + N);
+          terminal.writeln('');
+          terminal.writeln(Y + '  \u26A0 Claude is experiencing high demand right now.' + N);
+          terminal.writeln(Y + '  Your rate limit will reset in ' + W + '3h 47m' + N + Y + '.' + N);
+          terminal.writeln(D + '  Tip: Upgrade to Max for 20x higher usage.' + N);
+          terminal.writeln('');
+          terminal.writeln(D + '  (' + N + 'You stare at the terminal.' + D);
+          terminal.writeln('   The terminal stares back.' + D);
+          terminal.writeln('   You open a new tab and write the code yourself.)' + N);
+        },
+        // Context window
+        () => {
+          terminal.writeln(C + '>' + N + ' ' + W + 'fix one more bug please' + N);
+          terminal.writeln('');
+          terminal.writeln(Y + '  \u26A0 This conversation has used ' + W + '95%' + N + Y + ' of the context window.' + N);
+          terminal.writeln(Y + '  Auto-compacting conversation...' + N);
+          terminal.writeln(Y + '  Auto-compacting conversation...' + N);
+          terminal.writeln(Y + '  Auto-compacting conversation...' + N);
+          terminal.writeln('');
+          terminal.writeln(R + '  Error: Context window exceeded.' + N);
+          terminal.writeln(D + '  Claude has forgotten everything you discussed' + N);
+          terminal.writeln(D + '  for the past 2 hours. Start a new conversation.' + N);
+          terminal.writeln('');
+          terminal.writeln(D + '  (You whisper "I should have committed more often.")' + N);
+        },
+        // Max output tokens
+        () => {
+          terminal.writeln(C + '>' + N + ' ' + W + 'write comprehensive tests for every module' + N);
+          terminal.writeln('');
+          terminal.writeln(D + '  I\'ll write comprehensive tests for all 47 modules.' + N);
+          terminal.writeln(D + '  Starting with the first one...' + N);
+          terminal.writeln('');
+          terminal.writeln(G + '  // test_module_1.swift' + N);
+          terminal.writeln(G + '  func testInit() {' + N);
+          terminal.writeln(G + '    let sut = Modu\u2014' + N);
+          terminal.writeln('');
+          terminal.writeln(Y + '  \u26A0 Reached max output tokens for this turn.' + N);
+          terminal.writeln(D + '  (1 of 47 modules. 46 to go. Press Enter to continue.)' + N);
+          terminal.writeln('');
+          terminal.writeln(D + '  (The tests were never completed. They say Claude' + N);
+          terminal.writeln(D + '   is still thinking about testModule2 to this day.)' + N);
+        },
+        // 529 overloaded
+        () => {
+          terminal.writeln(C + '>' + N + ' ' + W + 'deploy to production' + N);
+          terminal.writeln('');
+          terminal.writeln(R + '  529 Overloaded' + N);
+          terminal.writeln(R + '  529 Overloaded' + N);
+          terminal.writeln(R + '  529 Overloaded' + N);
+          terminal.writeln('');
+          terminal.writeln(D + '  Claude is at capacity right now.' + N);
+          terminal.writeln(D + '  Please check back in:  ' + Y + '\u221E' + N);
+          terminal.writeln('');
+          terminal.writeln(D + '  (Friday 5pm deploy attempt #1 of 12.' + N);
+          terminal.writeln(D + '   You should not have waited until Friday.)' + N);
+        },
+      ];
+      scenarios[Math.floor(Math.random() * scenarios.length)]();
+      return;
+    }
+
     if (cmd === 'sudo') {
       const rest = parts.slice(1).join(' ');
       if (rest === 'make me a sandwich') {
