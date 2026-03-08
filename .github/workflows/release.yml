@@ -27,24 +27,10 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version $VERSION"
 
-      - name: Get Ghostty submodule SHA
-        id: ghostty-sha
-        run: echo "sha=$(git -C vendor/ghostty rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Cache GhosttyKit.xcframework
-        id: cache-ghostty
-        uses: actions/cache@v4
-        with:
-          path: vendor/ghostty/macos/GhosttyKit.xcframework
-          key: ghosttykit-${{ runner.arch }}-${{ steps.ghostty-sha.outputs.sha }}
-
-      - name: Install zig (cache miss only)
-        if: steps.cache-ghostty.outputs.cache-hit != 'true'
-        run: brew install zig
-
-      - name: Build GhosttyKit (cache miss only)
-        if: steps.cache-ghostty.outputs.cache-hit != 'true'
-        run: ./scripts/build-ghostty.sh
+      - name: Download pre-built GhosttyKit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/download-ghosttykit.sh
 
       - name: Build universal release binary
         run: swift build -c release --arch arm64 --arch x86_64
@@ -67,9 +53,16 @@ jobs:
           # Copy binary (universal path)
           cp .build/apple/Products/Release/${{ env.APP_NAME }} "$APP_BUNDLE/Contents/MacOS/${{ env.APP_NAME }}"
 
-          # Copy Info.plist and resources
+          # Copy Info.plist and icon
           cp MaQuake/Resources/Info.plist "$APP_BUNDLE/Contents/Info.plist"
           cp MaQuake/Resources/maquake.icns "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
+
+          # Copy SPM resource bundles
+          for bundle in .build/apple/Products/Release/*.bundle; do
+              [ -d "$bundle" ] || continue
+              name="$(basename "$bundle")"
+              cp -R "$bundle" "$APP_BUNDLE/Contents/Resources/$name"
+          done
 
           # Embed Sparkle.framework
           SPARKLE_SRC=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
