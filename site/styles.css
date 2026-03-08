@@ -100,6 +100,17 @@ h1.hero-title {
   font-family: "SF Mono", Menlo, monospace; font-size: 12px; color: var(--fg);
 }
 
+/* Scroll-down hint */
+.scroll-hint {
+  position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+  color: var(--accent); opacity: 0; transition: opacity .5s;
+  animation: scrollBounce 2s ease-in-out infinite;
+}
+@keyframes scrollBounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(8px); }
+}
+
 /* ── Quake Terminal (fixed, drops from top) ── */
 .quake-terminal {
   position: fixed; top: 48px; left: 0; right: 0;
@@ -360,3 +371,79 @@ h1.hero-title {
 /* ── Footer ── */
 footer { border-top: 1px solid var(--line); padding: 24px 0; color: var(--muted); font-size: 14px; }
 footer a { color: var(--accent); text-decoration: none; }
+
+/* ═══════════════════════════════════════════════
+   MOBILE
+   ═══════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* Nav */
+  .brand { font-size: 16px; gap: 8px; }
+  .brand__logo { width: 28px; height: 28px; font-size: 15px; }
+  .nav__links a { padding: 6px 8px; font-size: 13px; }
+  .alpha-badge { padding: 2px 8px; font-size: 10px; }
+
+  /* Hero */
+  .hero-description { font-size: 15px; }
+  .hero-description code { font-size: 13px; }
+  .cta { gap: 10px; }
+  .btn { padding: 10px 18px; font-size: 15px; gap: 8px; }
+  .btn svg { width: 18px; height: 18px; }
+  .hotkey-hint { font-size: 12px; padding: 6px 14px; bottom: 48px; }
+
+  /* Terminal — shorter on mobile */
+  .qt-body {
+    height: calc(40vh - 48px - 34px - 5px);
+    font-size: 10px; line-height: 1.5;
+  }
+  .qt-xterm { height: calc(40vh - 48px - 34px - 5px); }
+  .qt-line { white-space: pre-wrap; word-break: break-all; }
+  .qt-tabbar { padding: 0 6px; height: 30px; }
+  .qt-tab { font-size: 10px; padding: 2px 6px; gap: 3px; }
+  .qt-tab-dot { width: 5px; height: 5px; }
+  .qt-right-icons { gap: 0; padding-left: 4px; }
+  .qt-icon-btn { width: 22px; height: 22px; }
+  .qt-icon-btn svg { width: 12px; height: 12px; }
+  .qt-add-tab { width: 20px; height: 20px; font-size: 14px; }
+  .qt-brand-icon { width: 16px; height: 16px; font-size: 10px; }
+  .qt-brand { margin-right: 6px; padding-right: 6px; }
+
+  /* Features */
+  .features { padding: 80px 0; }
+  .section-heading { margin: 0 0 36px; }
+  .cards { grid-template-columns: 1fr; gap: 14px; }
+  .card { padding: 24px; }
+  .card-icon { font-size: 28px; margin-bottom: 10px; }
+  .card h4 { font-size: 17px; }
+  .card p { font-size: 14px; }
+
+  /* Try it */
+  .try-it { padding: 0 0 60px; }
+  .try-it .subtitle { font-size: 15px; }
+  .try-btn { padding: 12px 22px; font-size: 15px; }
+
+  /* Install */
+  .install { padding: 60px 0 80px; }
+  .install-code { padding: 16px 18px; font-size: 12px; overflow-x: auto; }
+
+  /* MCP */
+  .mcp { padding: 0 0 80px; }
+  .mcp .subtitle { font-size: 14px; }
+  .mcp .subtitle code { font-size: 12px; }
+  .mcp-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+  .mcp-tool { padding: 10px 12px; font-size: 12px; }
+
+  /* FAB */
+  .toggle-fab { bottom: 16px; right: 16px; padding: 8px 16px; font-size: 13px; }
+
+  /* Footer */
+  footer { font-size: 12px; padding: 20px 0; }
+}
+
+/* Extra small (iPhone SE, etc.) */
+@media (max-width: 390px) {
+  .hero-description { font-size: 14px; }
+  .btn { padding: 9px 14px; font-size: 14px; }
+  .qt-body { height: calc(35vh - 48px - 30px - 5px); font-size: 9px; }
+  .qt-xterm { height: calc(35vh - 48px - 30px - 5px); }
+  .nav__links a:not([aria-label]) { display: none; }
+}

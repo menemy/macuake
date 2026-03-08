@@ -16,6 +16,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const toggleFab = document.getElementById('toggle-fab');
   const tryBtn    = document.getElementById('try-btn');
   const pinBtn    = document.getElementById('qt-pin-btn');
+  const scrollHint = document.getElementById('scroll-hint');
 
   const demoScript = window.MQ_DEMO;
   const shell = window.MQ_SHELL;
@@ -114,7 +115,7 @@ window.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  setTimeout(() => { hotkeyHint.style.opacity = '1'; }, 2000);
+  setTimeout(() => { hotkeyHint.style.opacity = '1'; scrollHint.style.opacity = '1'; }, 2000);
 
   /* ═══════════════════════════════════════════════
      SCROLL-DRIVEN DEMO
@@ -236,7 +237,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
       scrollControlled = (p > 0.05 && p < 0.95);
 
-      if (p > 0.02) hotkeyHint.style.opacity = '0';
+      if (p > 0.02) { hotkeyHint.style.opacity = '0'; scrollHint.style.opacity = '0'; }
 
       // Hero content fade
       if (p < 0.10) { heroContent.style.opacity = '1'; heroContent.style.transform = 'translateY(0)'; }
