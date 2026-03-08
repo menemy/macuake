@@ -94,6 +94,17 @@ window.addEventListener('DOMContentLoaded', () => {
       '<div class="qt-line" style="opacity:1;height:auto"><span class="qt-prompt">~</span> <span class="qt-cursor blink"></span></div>';
   }
 
+  function killDemoSplit() {
+    const right = document.getElementById('qt-demo-right');
+    if (!right) return;
+    right.innerHTML =
+      '<div class="qt-line" style="opacity:1;height:auto"><span class="qt-prompt">~</span> python3 -m http.server 8080</div>' +
+      '<div class="qt-line" style="opacity:1;height:auto;color:#30d158">Serving HTTP on :: port 8080 (http://[::]:8080/) ...</div>' +
+      '<div class="qt-line" style="opacity:1;height:auto;color:#8e8e93">127.0.0.1 - [07/Mar/2026] "GET / HTTP/1.1" 200 -</div>' +
+      '<div class="qt-line" style="opacity:1;height:auto;color:#ff6b6b">^C</div>' +
+      '<div class="qt-line" style="opacity:1;height:auto"><span class="qt-prompt">~</span> <span class="qt-cursor blink"></span></div>';
+  }
+
   function hideDemoSplit() {
     if (!demoSplitActive) return;
     demoSplitActive = false;
@@ -110,7 +121,7 @@ window.addEventListener('DOMContentLoaded', () => {
       collectLeaves, addNewTab, closeTab, splitPane, closePane,
       pinBtn, backdrop,
       get interactiveOpen() { return interactiveOpen; },
-      toggleInteractive, renderTabs, renderPanes, showDemoSplit, fillDemoSplit, unfillDemoSplit, hideDemoSplit,
+      toggleInteractive, renderTabs, renderPanes, showDemoSplit, fillDemoSplit, unfillDemoSplit, killDemoSplit, hideDemoSplit,
     };
   }
 
@@ -315,6 +326,33 @@ window.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('keydown', (e) => {
     if (e.altKey && e.code === 'Space') { e.preventDefault(); toggleInteractive(); }
     if (e.code === 'Escape' && interactiveOpen) { toggleInteractive(); }
+
+    // Cmd+T — new tab
+    if (e.metaKey && e.key === 't' && interactiveOpen) {
+      e.preventDefault();
+      addNewTab();
+    }
+
+    // Cmd+W — close tab
+    if (e.metaKey && e.key === 'w' && interactiveOpen) {
+      e.preventDefault();
+      if (state.tabs.length > 1) closeTab(state.activeTabId);
+    }
+
+    // Cmd+1-9 — switch tabs
+    if (e.metaKey && !e.shiftKey && !e.altKey && e.key >= '1' && e.key <= '9' && interactiveOpen) {
+      e.preventDefault();
+      const idx = parseInt(e.key) - 1;
+      if (idx < state.tabs.length) {
+        const tab = state.tabs[idx];
+        if (state.activeTabId !== tab.id) {
+          state.activeTabId = tab.id;
+          focusedPaneId = activePanePerTab.get(tab.id) || collectLeaves(paneTrees.get(tab.id))[0];
+          renderTabs();
+          renderPanes();
+        }
+      }
+    }
   });
 
   toggleFab.addEventListener('click', toggleInteractive);
@@ -583,8 +621,9 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     terminal.attachCustomKeyEventHandler((e) => {
-      if (e.metaKey && e.key === 'v') return false;
-      if (e.metaKey && e.key === 'c') return false;
+      // Let browser/app handle Cmd+key combos
+      if (e.metaKey && (e.key === 'v' || e.key === 'c' || e.key === 't' || e.key === 'w')) return false;
+      if (e.metaKey && e.key >= '1' && e.key <= '9') return false;
       return true;
     });
 

@@ -87,22 +87,37 @@ window.MQ_DEMO = [
     }
   },
 
-  // 5. Close the server tab
+  // 5. Send Ctrl+C to stop the server, then close tab
   {
-    cmd: "macuake close-tab",
+    cmd: '',
+    skipPrompt: true,
     out: [
-      '<span class="qt-ok">Closed tab.</span> <span class="qt-out">1 tab remaining.</span>'
+      '',
+      '<span style="color:#636366">  Tool use</span>',
+      '<span style="color:#636366">     <span class="qt-jk">macuake</span> - <span style="color:#fff">control_char</span>(char: <span class="qt-js">"c"</span>) <span style="color:#636366">(MCP)</span></span>',
+      '<span style="color:#636366">     Send Ctrl+C to stop the running process.</span>',
+      '',
+      '<span class="qt-ok">  ^C sent.</span> <span class="qt-out">Server stopped.</span>',
+      '',
+      '<span style="color:#636366">  Tool use</span>',
+      '<span style="color:#636366">     <span class="qt-jk">macuake</span> - <span style="color:#fff">close_session</span>(tab: <span class="qt-js">"server"</span>) <span style="color:#636366">(MCP)</span></span>',
+      '<span style="color:#636366">     Close a terminal tab.</span>',
+      '',
+      '<span class="qt-ok">  Tab closed.</span> <span class="qt-out">1 tab remaining.</span>',
     ],
     onComplete: (ctx) => {
-      ctx.hideDemoSplit();
-      const serverTab = ctx.state.tabs.find(t => t.title === 'server');
-      if (serverTab) {
-        ctx.state.tabs = ctx.state.tabs.filter(t => t.id !== serverTab.id);
-        ctx.paneTrees.delete(serverTab.id);
-        ctx.activePanePerTab.delete(serverTab.id);
-        ctx.state.activeTabId = ctx.state.tabs[0].id;
-        ctx.renderTabs();
-      }
+      ctx.killDemoSplit();
+      setTimeout(() => {
+        ctx.hideDemoSplit();
+        const serverTab = ctx.state.tabs.find(t => t.title === 'server');
+        if (serverTab) {
+          ctx.state.tabs = ctx.state.tabs.filter(t => t.id !== serverTab.id);
+          ctx.paneTrees.delete(serverTab.id);
+          ctx.activePanePerTab.delete(serverTab.id);
+          ctx.state.activeTabId = ctx.state.tabs[0].id;
+          ctx.renderTabs();
+        }
+      }, 400);
     },
     onRevert: (ctx) => {
       // Re-add server tab and show filled split

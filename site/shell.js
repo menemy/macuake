@@ -15,7 +15,8 @@ window.MQ_SHELL = {
     'macuake pin','macuake unpin',
     'macuake resize --width','macuake resize --height',
     'macuake settings','macuake clear',
-    'ls','pwd','whoami','echo','cat README.md','cat Package.swift','neofetch','clear','help'
+    'ls','pwd','whoami','echo','cat README.md','cat Package.swift','neofetch','clear','help',
+    'fortune','cowsay','matrix','nmap','top','uptime','date','sl','brew install macuake'
   ],
 
   // Virtual filesystem for cat
@@ -157,6 +158,353 @@ window.MQ_SHELL = {
     }
     if (cmd === 'neofetch') {
       self.neofetch.forEach(([a, b]) => terminal.writeln(a + b));
+      return;
+    }
+
+    // ── Easter eggs ──
+
+    if (cmd === 'sudo') {
+      const rest = parts.slice(1).join(' ');
+      if (rest === 'make me a sandwich') {
+        terminal.writeln(D + '[sudo] password for user: ' + N + '********');
+        terminal.writeln(G + 'Okay.' + N);
+        terminal.writeln('  \u250C\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510');
+        terminal.writeln('  \u2502 ' + Y + '\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584' + N + ' \u2502');
+        terminal.writeln('  \u2502 ' + G + '\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591' + N + ' \u2502');
+        terminal.writeln('  \u2502 ' + R + '\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593\u2593' + N + ' \u2502');
+        terminal.writeln('  \u2502 ' + Y + '\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584\u2584' + N + ' \u2502');
+        terminal.writeln('  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518');
+      } else {
+        terminal.writeln(R + 'user is not in the sudoers file. This incident will be reported.' + N);
+      }
+      return;
+    }
+
+    if (input === 'rm -rf /' || input === 'rm -rf /*' || input.startsWith('rm -rf /')) {
+      terminal.writeln(R + 'macuake: refusing to destroy root.' + N);
+      terminal.writeln(D + 'nice try, chaos engineer.' + N);
+      return;
+    }
+
+    if (cmd === 'sl') {
+      terminal.writeln(D + '      ====        ________                ' + N);
+      terminal.writeln(D + '  _D _|  |_______/        \\__I_I_____===__|' + N);
+      terminal.writeln(D + ' |(_)---  |   H\\________/ |   |        =|_' + N);
+      terminal.writeln(D + ' /     |  |   H  |  |     |   |         ||' + N);
+      terminal.writeln(D + '|      |  |   H  |__----__|   |         | |' + N);
+      terminal.writeln(D + '|      |  |___H__|         |___|         |_|' + N);
+      terminal.writeln(D + '|______|     _|| ||_____     _|| ||________|' + N);
+      terminal.writeln(D + '       |   (____)       |   (____)         ' + N);
+      terminal.writeln(Y + 'tip: you probably meant ' + W + 'ls' + N);
+      return;
+    }
+
+    if (cmd === 'vim' || cmd === 'nvim' || cmd === 'vi') {
+      terminal.writeln('');
+      terminal.writeln(D + '~' + N);
+      terminal.writeln(D + '~' + N);
+      terminal.writeln(D + '~                    VIM - Vi IMproved' + N);
+      terminal.writeln(D + '~' + N);
+      terminal.writeln(D + '~                    version 9.1' + N);
+      terminal.writeln(D + '~              by Bram Moolenaar et al.' + N);
+      terminal.writeln(D + '~' + N);
+      terminal.writeln(D + '~' + N);
+      terminal.writeln(W + '-- INSERT --' + N + '                ' + D + 'type :q! to escape' + N);
+      return;
+    }
+
+    if (cmd === ':q' || cmd === ':q!' || cmd === ':wq' || cmd === ':x') {
+      if (cmd === ':q') {
+        terminal.writeln(R + 'E37: No write since last change' + N);
+        terminal.writeln(D + 'hint: try :q! or accept your fate' + N);
+      } else {
+        terminal.writeln(G + 'You escaped vim. Few have this power.' + N);
+      }
+      return;
+    }
+
+    if (cmd === 'emacs') {
+      terminal.writeln(D + 'Loading 127 packages...' + N);
+      terminal.writeln(D + 'Starting Emacs server...' + N);
+      terminal.writeln(D + 'Opening M-x therapist...' + N);
+      terminal.writeln(C + 'How does that make you feel?' + N);
+      return;
+    }
+
+    if (cmd === '42') {
+      terminal.writeln(C + 'Answer to the Ultimate Question detected.' + N);
+      terminal.writeln(D + 'Please provide a better question.' + N);
+      return;
+    }
+
+    if (cmd === 'fortune') {
+      const fortunes = [
+        '"There are only two hard things in Computer Science:\ncache invalidation, naming things, and off-by-one errors."',
+        '"It works on my machine." \u2014 Every developer, at some point',
+        '"Any sufficiently advanced technology is indistinguishable from magic."\n\u2014 Arthur C. Clarke',
+        '"Talk is cheap. Show me the code." \u2014 Linus Torvalds',
+        '"The best error message is the one that never shows up."\n\u2014 Thomas Fuchs',
+        '"Programming is the art of telling another human\nwhat one wants the computer to do." \u2014 Donald Knuth',
+        '"First, solve the problem. Then, write the code."\n\u2014 John Johnson',
+        '"Unix is user-friendly. It\'s just choosy about\nwho its friends are." \u2014 Anonymous',
+        '"There is no place like 127.0.0.1"',
+        '"Works on my machine. Ship the machine."',
+      ];
+      const f = fortunes[Math.floor(Math.random() * fortunes.length)];
+      f.split('\n').forEach(l => terminal.writeln(C + l + N));
+      return;
+    }
+
+    if (cmd === 'cowsay') {
+      const msg = parts.slice(1).join(' ') || 'moo';
+      const line = '\u2500'.repeat(msg.length + 2);
+      terminal.writeln(' \u250C' + line + '\u2510');
+      terminal.writeln(' \u2502 ' + msg + ' \u2502');
+      terminal.writeln(' \u2514' + line + '\u2518');
+      terminal.writeln('        \\   ^__^');
+      terminal.writeln('         \\  (oo)\\_______');
+      terminal.writeln('            (__)\\       )\\/\\');
+      terminal.writeln('                ||----w |');
+      terminal.writeln('                ||     ||');
+      return;
+    }
+
+    if (cmd === 'make') {
+      const target = parts.slice(1).join(' ') || 'love';
+      terminal.writeln(R + 'make: *** No rule to make target \'' + target + '\'. Stop.' + N);
+      return;
+    }
+
+    if (cmd === 'iddqd') {
+      terminal.writeln(G + W + 'GOD MODE ON' + N);
+      terminal.writeln(D + 'damage: ' + G + '0' + N);
+      terminal.writeln(D + 'confidence: ' + G + '+9000' + N);
+      return;
+    }
+
+    if (cmd === 'idkfa') {
+      terminal.writeln(G + W + 'ALL KEYS ACQUIRED' + N);
+      terminal.writeln(D + 'ammo: ' + G + 'infinite' + N);
+      terminal.writeln(D + 'tabs open: ' + Y + '47' + N);
+      return;
+    }
+
+    if (cmd === 'xyzzy') {
+      terminal.writeln(D + 'A hollow voice says ' + W + '"Fool."' + N);
+      return;
+    }
+
+    if (cmd === 'nmap') {
+      terminal.writeln(D + 'Starting Nmap 7.94 ...' + N);
+      terminal.writeln('');
+      terminal.writeln(W + 'PORT      STATE  SERVICE' + N);
+      terminal.writeln(G + '22/tcp    open   ' + N + 'curiosity');
+      terminal.writeln(G + '80/tcp    open   ' + N + 'creativity');
+      terminal.writeln(G + '443/tcp   open   ' + N + 'shipping');
+      terminal.writeln(G + '8080/tcp  open   ' + N + 'dev-server');
+      terminal.writeln(G + '31337/tcp open   ' + N + C + 'elite' + N);
+      return;
+    }
+
+    if (cmd === 'brew') {
+      if (parts[1] === 'install' && parts[2] === 'macuake') {
+        terminal.writeln(G + '==> ' + N + W + 'Downloading macuake...' + N);
+        terminal.writeln(G + '==> ' + N + 'Pouring macuake-1.0.0.arm64_sonoma.bottle.tar.gz');
+        terminal.writeln(G + '\uD83C\uDF7A ' + N + W + 'macuake' + N + ' installed successfully');
+        terminal.writeln(D + 'Try: ' + C + 'macuake --quake-mode' + N);
+      } else {
+        terminal.writeln(D + 'Usage: brew install macuake' + N);
+      }
+      return;
+    }
+
+    if (cmd === 'python' || cmd === 'python3') {
+      terminal.writeln(D + 'Python 3.12.0' + N);
+      terminal.writeln(D + '>>> ' + C + 'import antigravity' + N);
+      terminal.writeln(G + 'xkcd.com/353 \u2014 I\'m flying!' + N);
+      return;
+    }
+
+    if (cmd === 'node') {
+      terminal.writeln(D + 'Welcome to Node.js v22.0.0.' + N);
+      terminal.writeln(D + '> ' + C + 'typeof NaN' + N);
+      terminal.writeln(Y + '\'number\'' + N);
+      terminal.writeln(D + '> ' + N + D + '// of course it is' + N);
+      return;
+    }
+
+    if (cmd === 'git') {
+      if (parts[1] === 'push' && parts.includes('--force')) {
+        terminal.writeln(R + 'Whoa there.' + N);
+        terminal.writeln(D + 'git push --force?' + N + Y + ' You monster.' + N);
+        return;
+      }
+      if (parts[1] === 'blame') {
+        terminal.writeln(D + 'git blame? In ' + W + 'this' + N + D + ' economy?' + N);
+        return;
+      }
+      terminal.writeln(D + 'git: this is a demo terminal.' + N);
+      terminal.writeln(D + 'But yes, macuake ' + W + 'does' + N + D + ' support git.' + N);
+      return;
+    }
+
+    if (cmd === 'docker') {
+      terminal.writeln(D + 'Cannot connect to the Docker daemon.' + N);
+      terminal.writeln(D + 'Is the Docker daemon running?' + N);
+      terminal.writeln(Y + '(It never is when you need it.)' + N);
+      return;
+    }
+
+    if (cmd === 'ping') {
+      terminal.writeln(G + 'PONG' + N);
+      return;
+    }
+
+    if (cmd === 'exit') {
+      terminal.writeln(D + 'There is no escape.' + N);
+      terminal.writeln(D + 'Press ' + W + 'Option+Space' + N + D + ' to hide the terminal.' + N);
+      return;
+    }
+
+    if (cmd === 'ssh') {
+      terminal.writeln(R + 'ssh: connect to host ' + (parts[1] || 'localhost') + ' port 22: Connection refused' + N);
+      terminal.writeln(D + '(nice try)' + N);
+      return;
+    }
+
+    if (cmd === 'curl') {
+      if (input.includes('parrot.live')) {
+        terminal.writeln(G + '            .--.' + N);
+        terminal.writeln(G + '           /    \\' + N);
+        terminal.writeln(Y + '          ## a]a ## ' + N);
+        terminal.writeln(Y + '          \\  =  / ' + N);
+        terminal.writeln(R + '           />--<' + N);
+        terminal.writeln(R + '          //     \\\\' + N);
+        terminal.writeln(D + '   PARTY PARROT!' + N);
+      } else {
+        terminal.writeln(D + 'curl: this is a demo. Try ' + C + 'curl parrot.live' + N);
+      }
+      return;
+    }
+
+    if (cmd === 'telnet') {
+      terminal.writeln(D + 'Trying ' + (parts[1] || '...') + '...' + N);
+      terminal.writeln(D + 'Connected to a galaxy far, far away.' + N);
+      terminal.writeln(Y + '           .          .' + N);
+      terminal.writeln(Y + '     .  *        *   .    *' + N);
+      terminal.writeln(Y + '  *    STAR WARS     .  *' + N);
+      terminal.writeln(Y + '     .          *       .' + N);
+      terminal.writeln(D + 'Connection closed.' + N);
+      return;
+    }
+
+    if (cmd === 'konami' || input === 'up up down down left right left right b a') {
+      terminal.writeln(Y + '\u2191 \u2191 \u2193 \u2193 \u2190 \u2192 \u2190 \u2192 B A' + N);
+      terminal.writeln(G + W + '+30 extra lives' + N);
+      terminal.writeln(D + '(you\'ll need them for debugging)' + N);
+      return;
+    }
+
+    if (cmd === 'hacktheplanet' || input === 'hack the planet') {
+      terminal.writeln('');
+      terminal.writeln(G + W + '  HACK THE PLANET!' + N);
+      terminal.writeln(D + '  modem noises intensify...' + N);
+      terminal.writeln(D + '  [' + G + '\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588' + D + '] 100%' + N);
+      terminal.writeln(G + '  Access granted.' + N);
+      terminal.writeln('');
+      return;
+    }
+
+    if (cmd === 'matrix') {
+      const chars = '\u30A2\u30AB\u30B5\u30BF\u30CA\u30CF\u30DE\u30E4\u30E9\u30EF01';
+      for (let i = 0; i < 6; i++) {
+        let line = '';
+        for (let j = 0; j < 40; j++) { line += (Math.random() > 0.7 ? G + W : G) + chars[Math.floor(Math.random() * chars.length)]; }
+        terminal.writeln(line + N);
+      }
+      terminal.writeln(G + W + '  Wake up, Neo...' + N);
+      return;
+    }
+
+    if (input === ':(){ :|:& };:') {
+      terminal.writeln(R + 'fork bomb signature detected.' + N);
+      terminal.writeln(D + 'spawning 0 processes.' + N);
+      terminal.writeln(D + 'nice museum piece.' + N);
+      return;
+    }
+
+    if (cmd === 'apt-get' || cmd === 'apt' || cmd === 'yum' || cmd === 'dnf' || cmd === 'pacman') {
+      terminal.writeln(R + cmd + ': command not found' + N);
+      terminal.writeln(D + 'This is macOS. Try ' + C + 'brew install macuake' + N);
+      return;
+    }
+
+    if (cmd === 'top' || cmd === 'htop') {
+      terminal.writeln(W + 'PID    CPU%  MEM%  COMMAND' + N);
+      terminal.writeln(G + '1337   0.0   0.1   macuake' + N);
+      terminal.writeln(D + '420    98.2  45.0   node_modules' + N);
+      terminal.writeln(D + '9999   12.4  8.3    vscode --disable-gpu' + N);
+      terminal.writeln(D + '666    0.0   99.9   chrome' + N);
+      terminal.writeln(D + '42     4.2   2.1    slack' + N);
+      return;
+    }
+
+    if (cmd === 'uptime') {
+      terminal.writeln(D + 'up 42 days, 13:37, 1 user, load averages: 0.42 0.13 0.37' + N);
+      return;
+    }
+
+    if (cmd === 'date') {
+      terminal.writeln(new Date().toString());
+      return;
+    }
+
+    if (cmd === 'lolcat' || cmd === 'cmatrix' || cmd === 'figlet' || cmd === 'toilet') {
+      terminal.writeln(D + cmd + ': great taste. Try ' + C + 'cowsay' + N + D + ' or ' + C + 'fortune' + N + D + ' instead.' + N);
+      return;
+    }
+
+    if (cmd === 'rm') {
+      terminal.writeln(Y + 'rm: not today.' + N);
+      return;
+    }
+
+    if (cmd === 'man') {
+      terminal.writeln(D + 'No manual entry for ' + (parts[1] || 'nothing') + '.' + N);
+      terminal.writeln(D + 'Try ' + C + 'help' + N + D + ' instead.' + N);
+      return;
+    }
+
+    if (cmd === 'yes') {
+      for (let i = 0; i < 8; i++) terminal.writeln(G + (parts[1] || 'y') + N);
+      terminal.writeln(D + '^C' + N);
+      return;
+    }
+
+    if (cmd === 'hello' || cmd === 'hi' || cmd === 'hey') {
+      terminal.writeln(C + 'Hello! \uD83D\uDC4B Type ' + W + 'help' + N + C + ' to see what I can do.' + N);
+      return;
+    }
+
+    if (cmd === 'cd') {
+      terminal.writeln(D + '(nowhere to go, but you\'re already home)' + N);
+      return;
+    }
+
+    if (cmd === 'touch') {
+      terminal.writeln(D + 'touch: permission denied (read-only demo)' + N);
+      return;
+    }
+
+    if (cmd === 'chmod' || cmd === 'chown') {
+      terminal.writeln(R + cmd + ': operation not permitted' + N);
+      terminal.writeln(D + 'nice try, root.' + N);
+      return;
+    }
+
+    if (cmd === 'which') {
+      if (parts[1] === 'macuake') { terminal.writeln('/usr/local/bin/macuake'); }
+      else { terminal.writeln(D + parts[1] + ' not found' + N); }
       return;
     }
 
