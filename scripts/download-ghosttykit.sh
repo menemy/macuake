@@ -31,5 +31,9 @@ if gh release download "$TAG" --repo "$REPO" --pattern "GhosttyKit.xcframework.t
 else
     echo "No pre-built release found for $TAG"
     echo "Falling back to building from source..."
+    if ! command -v zig &>/dev/null; then
+        echo "Installing zig..."
+        brew install zig
+    fi
     "$SCRIPT_DIR/build-ghostty.sh"
 fi
