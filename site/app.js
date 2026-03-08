@@ -281,7 +281,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Section reveals
   gsap.utils.toArray('.card').forEach((c, i) => { gsap.from(c, { scrollTrigger: { trigger: c, start: 'top 85%' }, y: 60, opacity: 0, duration: 0.8, delay: i * 0.1 }); });
-  gsap.utils.toArray('.mcp-tool').forEach((t, i) => { gsap.from(t, { scrollTrigger: { trigger: '.mcp-grid', start: 'top 80%' }, y: 20, opacity: 0, duration: 0.5, delay: i * 0.05 }); });
+  gsap.utils.toArray('.faq-item').forEach((t, i) => { gsap.from(t, { scrollTrigger: { trigger: '.faq-grid', start: 'top 80%' }, y: 20, opacity: 0, duration: 0.5, delay: i * 0.05 }); });
   gsap.from('.install-code', { scrollTrigger: { trigger: '.install-code', start: 'top 80%' }, y: 30, opacity: 0, duration: 0.8 });
 
   /* ═══════════════════════════════════════════════

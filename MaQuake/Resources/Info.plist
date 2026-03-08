@@ -13,7 +13,7 @@
     <key>LSUIElement</key>
     <true/>
     <key>CFBundleIconFile</key>
-    <string></string>
+    <string>maquake</string>
     <key>SUFeedURL</key>
     <string>https://macuake.com/appcast.xml</string>
     <key>SUPublicEDKey</key>

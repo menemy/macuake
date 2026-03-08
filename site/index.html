@@ -190,27 +190,90 @@
     </div>
   </section>
 
-  <!-- ════ MCP ════ -->
-  <section id="mcp" class="mcp">
+  <!-- ════ Why macuake ════ -->
+  <section id="why" class="why">
     <div class="wrap">
-      <h2 class="section-heading">MCP Tools</h2>
-      <p class="subtitle">Add to Claude Code: <code>claude mcp add --transport http macuake http://localhost:19876/mcp</code></p>
-      <div class="mcp-grid">
-        <div class="mcp-tool"><span class="icon">&#x25B6;</span> execute</div>
-        <div class="mcp-tool"><span class="icon">&#x1F4C4;</span> read</div>
-        <div class="mcp-tool"><span class="icon">&#x1F4CB;</span> paste</div>
-        <div class="mcp-tool"><span class="icon">&#x1F5C2;</span> list</div>
-        <div class="mcp-tool"><span class="icon">&#x2795;</span> new_tab</div>
-        <div class="mcp-tool"><span class="icon">&#x1F4CD;</span> focus</div>
-        <div class="mcp-tool"><span class="icon">&#x274C;</span> close_session</div>
-        <div class="mcp-tool"><span class="icon">&#x1F504;</span> toggle</div>
-        <div class="mcp-tool"><span class="icon">&#x1F441;</span> show / hide</div>
-        <div class="mcp-tool"><span class="icon">&#x1F4CC;</span> pin / unpin</div>
-        <div class="mcp-tool"><span class="icon">&#x2702;</span> split</div>
-        <div class="mcp-tool"><span class="icon">&#x1F9F9;</span> clear</div>
-        <div class="mcp-tool"><span class="icon">&#x2328;</span> control_char</div>
-        <div class="mcp-tool"><span class="icon">&#x1F4CA;</span> state</div>
-        <div class="mcp-tool"><span class="icon">&#x1F3F7;</span> set_appearance</div>
+      <h2 class="section-heading">Why macuake?</h2>
+      <div class="compare-table">
+        <div class="compare-header">
+          <div class="compare-label"></div>
+          <div class="compare-col">macuake</div>
+          <div class="compare-col">iTerm2 hotkey</div>
+          <div class="compare-col">Alacritty</div>
+        </div>
+        <div class="compare-row">
+          <div class="compare-label">Quake drop-down</div>
+          <div class="compare-col yes">&#x2713;</div>
+          <div class="compare-col partial">partial</div>
+          <div class="compare-col no">&#x2717;</div>
+        </div>
+        <div class="compare-row">
+          <div class="compare-label">GPU rendering</div>
+          <div class="compare-col yes">Metal</div>
+          <div class="compare-col no">CPU</div>
+          <div class="compare-col yes">GPU</div>
+        </div>
+        <div class="compare-row">
+          <div class="compare-label">MCP / AI control</div>
+          <div class="compare-col yes">17 tools</div>
+          <div class="compare-col no">&#x2717;</div>
+          <div class="compare-col no">&#x2717;</div>
+        </div>
+        <div class="compare-row">
+          <div class="compare-label">No Dock icon</div>
+          <div class="compare-col yes">&#x2713;</div>
+          <div class="compare-col no">&#x2717;</div>
+          <div class="compare-col no">&#x2717;</div>
+        </div>
+        <div class="compare-row">
+          <div class="compare-label">Split panes</div>
+          <div class="compare-col yes">&#x2713;</div>
+          <div class="compare-col yes">&#x2713;</div>
+          <div class="compare-col no">&#x2717;</div>
+        </div>
+        <div class="compare-row">
+          <div class="compare-label">Socket API</div>
+          <div class="compare-col yes">&#x2713;</div>
+          <div class="compare-col partial">AppleScript</div>
+          <div class="compare-col no">&#x2717;</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════ FAQ ════ -->
+  <section id="faq" class="faq">
+    <div class="wrap">
+      <h2 class="section-heading">FAQ</h2>
+      <div class="faq-grid">
+        <details class="faq-item">
+          <summary>How is this different from iTerm2&rsquo;s hotkey window?</summary>
+          <p>iTerm2&rsquo;s hotkey profile is a side feature. macuake is purpose-built for the drop-down workflow: GPU-accelerated via Ghostty, no Dock icon, built-in MCP for AI control, and a Unix socket API for scripting.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Does it support my Ghostty config?</summary>
+          <p>Yes. macuake reads your standard <code>~/.config/ghostty/config</code>. Fonts, colors, keybindings, opacity &mdash; all apply automatically.</p>
+        </details>
+        <details class="faq-item">
+          <summary>What about multiple monitors?</summary>
+          <p>macuake drops down on the display where your cursor is, or you can pin it to a specific monitor in Settings.</p>
+        </details>
+        <details class="faq-item">
+          <summary>How do I use the MCP server?</summary>
+          <p>Add to Claude Code: <code>claude mcp add macuake http://localhost:19876/mcp</code>. Works with any MCP client. 17 tools for full terminal control.</p>
+        </details>
+        <details class="faq-item">
+          <summary>What&rsquo;s the performance impact?</summary>
+          <p>Near zero. macuake uses ~20MB idle, GPU rendering via Metal. No Electron, no web views. Pure native Swift + GhosttyKit.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Is it safe? Can anything control my terminal remotely?</summary>
+          <p>The MCP server and Socket API are <strong>disabled by default</strong>. You explicitly enable them in Settings when you need AI or scripting access. When disabled, nothing can send commands to macuake. No network access, no telemetry, no analytics.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Is it open source?</summary>
+          <p>Yes, MIT license. <a href="https://github.com/menemy/macuake" target="_blank" rel="noopener">github.com/menemy/macuake</a></p>
+        </details>
       </div>
     </div>
   </section>
@@ -218,7 +281,7 @@
 
 <footer>
   <div class="wrap">
-    <p>Made by <a href="https://x.com/menemy" target="_blank" rel="noopener">@menemy</a> &bull; macuake is open source under MIT &bull; Powered by <a href="https://ghostty.org" target="_blank" rel="noopener">Ghostty</a></p>
+    <p>Made by <a href="https://www.linkedin.com/in/nagaev-maksim/" target="_blank" rel="noopener">Maksim Nagaev</a> &bull; macuake is open source under MIT &bull; Powered by <a href="https://ghostty.org" target="_blank" rel="noopener">Ghostty</a></p>
   </div>
 </footer>
 
