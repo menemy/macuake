@@ -1,10 +1,10 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 5.10
 import PackageDescription
 
 let package = Package(
     name: "Macuake",
     platforms: [
-        .macOS(.v26)
+        .macOS(.v14)
     ],
     dependencies: [
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts.git", from: "2.0.0"),
@@ -28,9 +28,6 @@ let package = Package(
             resources: [
                 .process("../../Resources"),
             ],
-            swiftSettings: [
-                .swiftLanguageMode(.v5),
-            ],
             linkerSettings: [
                 .linkedFramework("Metal"),
                 .linkedFramework("QuartzCore"),
@@ -41,10 +38,7 @@ let package = Package(
         .testTarget(
             name: "MacuakeTests",
             dependencies: ["Macuake"],
-            path: "MaQuake/Tests/MaQuakeTests",
-            swiftSettings: [
-                .swiftLanguageMode(.v5),
-            ]
+            path: "MaQuake/Tests/MaQuakeTests"
         ),
     ]
 )

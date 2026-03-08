@@ -22,14 +22,22 @@ cp .build/apple/Products/Release/Macuake "$BINARY"
 echo "==> Copying Info.plist..."
 cp "$PROJECT_ROOT/MaQuake/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 
-echo "==> Copying resource bundles..."
+echo "==> Copying icon..."
 RESOURCES_DIR="$APP_BUNDLE/Contents/Resources"
 mkdir -p "$RESOURCES_DIR"
+cp "$PROJECT_ROOT/MaQuake/Resources/maquake.icns" "$RESOURCES_DIR/" 2>/dev/null || true
+
+echo "==> Copying resource bundles..."
 for bundle in .build/apple/Products/Release/*.bundle; do
     [ -d "$bundle" ] || continue
+    # Skip bundles without Info.plist — they can't be codesigned
+    [ -f "$bundle/Info.plist" ] || [ -f "$bundle/Contents/Info.plist" ] || continue
     name="$(basename "$bundle")"
     rm -rf "$RESOURCES_DIR/$name"
     cp -R "$bundle" "$RESOURCES_DIR/$name"
+    # SPM resource accessor looks next to binary
+    rm -rf "$APP_BUNDLE/Contents/MacOS/$name"
+    cp -R "$bundle" "$APP_BUNDLE/Contents/MacOS/$name"
     echo "    $name"
 done
 

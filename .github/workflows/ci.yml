@@ -14,11 +14,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install dependencies
-        run: brew install zig
-
-      - name: Build GhosttyKit
-        run: ./scripts/build-ghostty.sh
+      - name: Download pre-built GhosttyKit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/download-ghosttykit.sh
 
       - name: Build
         run: swift build

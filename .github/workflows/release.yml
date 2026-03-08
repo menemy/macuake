@@ -20,9 +20,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install dependencies
-        run: brew install zig
-
       - name: Extract version from tag
         id: version
         run: |
@@ -30,11 +27,21 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version $VERSION"
 
-      - name: Build GhosttyKit
-        run: ./scripts/build-ghostty.sh
+      - name: Check available secrets
+        id: secrets
+        run: |
+          echo "has_signing=${{ secrets.CERTIFICATE_P12 != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_notarize=${{ secrets.APPLE_ID != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_sparkle=${{ secrets.SPARKLE_PRIVATE_KEY != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_tap=${{ secrets.HOMEBREW_TAP_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
 
-      - name: Build universal release binary
-        run: swift build -c release --arch arm64 --arch x86_64
+      - name: Download pre-built GhosttyKit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./scripts/download-ghosttykit.sh
+
+      - name: Build release binary
+        run: swift build -c release
 
       - name: Prepare app bundle
         run: |
@@ -51,15 +58,28 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" \
             MaQuake/Resources/Info.plist
 
-          # Copy binary (universal path)
-          cp .build/apple/Products/Release/${{ env.APP_NAME }} "$APP_BUNDLE/Contents/MacOS/${{ env.APP_NAME }}"
+          # Copy binary
+          cp .build/release/${{ env.APP_NAME }} "$APP_BUNDLE/Contents/MacOS/${{ env.APP_NAME }}" 2>/dev/null \
+            || cp .build/arm64-apple-macosx/release/${{ env.APP_NAME }} "$APP_BUNDLE/Contents/MacOS/${{ env.APP_NAME }}"
 
-          # Copy Info.plist and resources
+          # Copy Info.plist and icon
           cp MaQuake/Resources/Info.plist "$APP_BUNDLE/Contents/Info.plist"
           cp MaQuake/Resources/maquake.icns "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
 
+          # Copy SPM resource bundles that have valid Info.plist (codesign-compatible)
+          for dir in .build/release .build/arm64-apple-macosx/release .build/apple/Products/Release; do
+              for bundle in "$dir"/*.bundle; do
+                  [ -d "$bundle" ] || continue
+                  [ -f "$bundle/Info.plist" ] || [ -f "$bundle/Contents/Info.plist" ] || continue
+                  name="$(basename "$bundle")"
+                  cp -R "$bundle" "$APP_BUNDLE/Contents/Resources/$name"
+                  cp -R "$bundle" "$APP_BUNDLE/Contents/MacOS/$name"
+              done
+          done
+
           # Embed Sparkle.framework
-          SPARKLE_SRC=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+          SPARKLE_SRC=$(find .build -path "*/macos-arm64*/Sparkle.framework" -type d | head -1)
+          [ -z "$SPARKLE_SRC" ] && SPARKLE_SRC=".build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
           cp -R "$SPARKLE_SRC" "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
 
           # Add rpath for embedded frameworks
@@ -67,6 +87,7 @@ jobs:
             "$APP_BUNDLE/Contents/MacOS/${{ env.APP_NAME }}" 2>/dev/null || true
 
       - name: Import signing certificate
+        if: steps.secrets.outputs.has_signing == 'true'
         env:
           CERTIFICATE_P12: ${{ secrets.CERTIFICATE_P12 }}
           CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
@@ -90,12 +111,19 @@ jobs:
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain
 
       - name: Sign app bundle (inside-out)
+        if: steps.secrets.outputs.has_signing == 'true'
         run: |
           APP_BUNDLE="build/${{ env.APP_NAME }}.app"
           IDENTITY="${{ secrets.SIGNING_IDENTITY }}"
           ENTITLEMENTS="MaQuake/Resources/MaQuake.entitlements"
 
-          # Sign Sparkle XPC services and helpers first (inside-out)
+          # Sign resource bundles in MacOS/ first
+          for bundle in "$APP_BUNDLE"/Contents/MacOS/*.bundle; do
+              [ -d "$bundle" ] || continue
+              codesign --force --sign "$IDENTITY" "$bundle"
+          done
+
+          # Sign Sparkle XPC services and helpers (inside-out)
           codesign --force --sign "$IDENTITY" --options runtime \
             "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc"
           codesign --force --sign "$IDENTITY" --options runtime \
@@ -115,16 +143,26 @@ jobs:
 
           codesign --verify --deep --strict "$APP_BUNDLE"
 
+      - name: Ad-hoc sign (when no certificate)
+        if: steps.secrets.outputs.has_signing != 'true'
+        run: |
+          codesign --force --deep --sign - "build/${{ env.APP_NAME }}.app"
+
       - name: Create DMG
         run: |
           hdiutil create -volname "${{ env.APP_NAME }}" \
             -srcfolder "build/${{ env.APP_NAME }}.app" \
             -ov -format UDZO \
             "build/${{ env.APP_NAME }}.dmg"
+
+      - name: Sign DMG
+        if: steps.secrets.outputs.has_signing == 'true'
+        run: |
           codesign --force --sign "${{ secrets.SIGNING_IDENTITY }}" \
             "build/${{ env.APP_NAME }}.dmg"
 
       - name: Notarize DMG
+        if: steps.secrets.outputs.has_notarize == 'true'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
@@ -138,6 +176,7 @@ jobs:
           xcrun stapler staple "build/${{ env.APP_NAME }}.dmg"
 
       - name: Sign update with Sparkle
+        if: steps.secrets.outputs.has_sparkle == 'true'
         env:
           SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
@@ -147,6 +186,7 @@ jobs:
           rm "$RUNNER_TEMP/sparkle_key"
 
       - name: Generate appcast
+        if: steps.secrets.outputs.has_sparkle == 'true'
         env:
           SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
         run: |
@@ -162,6 +202,8 @@ jobs:
             /tmp/appcast_dir
 
           rm "$RUNNER_TEMP/sparkle_key"
+          # Fix title to lowercase branding
+          sed -i '' 's|<title>Macuake</title>|<title>macuake</title>|' /tmp/appcast_dir/appcast.xml
           cp /tmp/appcast_dir/appcast.xml build/appcast.xml
 
       - name: Create GitHub Release
@@ -170,6 +212,48 @@ jobs:
           files: |
             build/${{ env.APP_NAME }}.dmg
             build/appcast.xml
+          fail_on_unmatched_files: false
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+
+      - name: Update Homebrew cask
+        if: steps.secrets.outputs.has_tap == 'true' && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc')
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA=$(shasum -a 256 "build/${{ env.APP_NAME }}.dmg" | awk '{print $1}')
+
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/menemy/homebrew-macuake.git" /tmp/tap
+          cd /tmp/tap
+
+          python3 -c "
+          v, s = '$VERSION', '$SHA'
+          print(f'''cask \"macuake\" do
+            version \"{v}\"
+            sha256 \"{s}\"
+
+            url \"https://github.com/menemy/macuake/releases/download/v#{{version}}/Macuake.dmg\"
+            name \"Macuake\"
+            desc \"Drop-down Quake-style terminal for macOS powered by Ghostty\"
+            homepage \"https://macuake.com\"
+
+            depends_on macos: \">= :sonoma\"
+
+            app \"Macuake.app\"
+
+            zap trash: [
+              \"~/Library/Preferences/com.macuake.terminal.plist\",
+              \"~/Library/Application Support/macuake\",
+            ]
+          end''')
+          " | sed 's/^          //' > Casks/macuake.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/macuake.rb
+          if ! git diff --cached --quiet; then
+            git commit -m "Update macuake to $VERSION"
+            git push
+          fi
