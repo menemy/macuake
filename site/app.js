@@ -46,7 +46,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   let mode = 'demo';
   let interactiveOpen = false;
-  let scrollControlled = false;
   let demoCompleted = false;
 
   function collectLeaves(node) {
@@ -111,7 +110,7 @@ window.addEventListener('DOMContentLoaded', () => {
       collectLeaves, addNewTab, closeTab, splitPane, closePane,
       pinBtn, backdrop,
       get interactiveOpen() { return interactiveOpen; },
-      toggleInteractive, renderTabs, showDemoSplit, fillDemoSplit, unfillDemoSplit, hideDemoSplit,
+      toggleInteractive, renderTabs, renderPanes, showDemoSplit, fillDemoSplit, unfillDemoSplit, hideDemoSplit,
     };
   }
 
@@ -235,13 +234,11 @@ window.addEventListener('DOMContentLoaded', () => {
         renderTabs();
       }
 
-      scrollControlled = (p > 0.05 && p < 0.95);
-
       if (p > 0.02) { hotkeyHint.style.opacity = '0'; scrollHint.style.opacity = '0'; }
 
       // Hero content fade
-      if (p < 0.10) { heroContent.style.opacity = '1'; heroContent.style.transform = 'translateY(0)'; }
-      else if (p < 0.22) { const f = (p - 0.10) / 0.12; heroContent.style.opacity = String(1 - f); heroContent.style.transform = 'translateY(' + (-f * 50) + 'px)'; }
+      if (p < 0.10) { heroContent.style.opacity = '1'; heroContent.style.transform = 'translateY(0)'; heroContent.style.pointerEvents = ''; }
+      else if (p < 0.22) { const f = (p - 0.10) / 0.12; heroContent.style.opacity = String(1 - f); heroContent.style.transform = 'translateY(' + (-f * 50) + 'px)'; heroContent.style.pointerEvents = 'none'; }
       else { heroContent.style.opacity = '0'; heroContent.style.pointerEvents = 'none'; }
 
       // Keep demo mode during scroll

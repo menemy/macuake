@@ -182,8 +182,8 @@ window.MQ_SHELL = {
         return;
       }
 
-      // ── ls (list tabs & panes) ──
-      if (sub === 'ls') {
+      // ── ls / list (tabs & panes) ──
+      if (sub === 'ls' || sub === 'list') {
         ctx.state.tabs.forEach((t, i) => {
           const tree = ctx.paneTrees.get(t.id);
           const panes = tree ? ctx.collectLeaves(tree) : [];
@@ -258,6 +258,7 @@ window.MQ_SHELL = {
         if (!found) { terminal.writeln(R + 'No tab matching id ' + id + N); return; }
         ctx.state.activeTabId = id;
         ctx.renderTabs();
+        if (ctx.renderPanes) ctx.renderPanes();
         terminal.writeln(G + 'Focused tab ' + N + W + '"' + found.title + '"' + N);
         return;
       }

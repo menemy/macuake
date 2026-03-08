@@ -9,7 +9,7 @@ body {
   font: 17px/1.47 -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
   color: var(--fg); background: var(--bg); overflow-x: hidden;
 }
-html, body { max-width: 100vw; touch-action: pan-y; }
+body { max-width: 100%; touch-action: pan-y; }
 a { color: inherit; }
 .wrap { max-width: 1080px; margin: 0 auto; padding: 0 48px; }
 @media (max-width: 768px) { .wrap { padding: 0 20px; } }
@@ -205,13 +205,17 @@ h1.hero-title {
   flex: 1; padding: 10px 14px;
   overflow-y: auto; overflow-x: hidden;
   min-width: 0; height: 100%;
+  scrollbar-width: none;
 }
+.qt-demo-left::-webkit-scrollbar { display: none; }
 .qt-demo-right {
   flex: 1; padding: 10px 14px;
   overflow-y: auto; overflow-x: hidden;
   min-width: 0; opacity: 0;
   transition: opacity .4s ease;
+  scrollbar-width: none;
 }
+.qt-demo-right::-webkit-scrollbar { display: none; }
 .qt-demo-right.visible { opacity: 1; }
 @media (max-width: 768px) { .qt-demo-left, .qt-demo-right { font-size: 10.5px; padding: 8px 10px; } }
 
@@ -348,7 +352,7 @@ h1.hero-title {
   max-width: 600px; margin: 0 auto; background: #111;
   border: 1px solid var(--line); border-radius: 12px; padding: 20px 24px;
   font-family: "SF Mono", Menlo, monospace; font-size: 15px; color: var(--accent);
-  overflow-x: auto; word-break: break-all;
+  overflow-x: auto; overflow-wrap: break-word;
 }
 .install-code .comment { color: var(--muted); }
 
