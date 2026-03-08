@@ -243,6 +243,10 @@ window.addEventListener('DOMContentLoaded', () => {
         state.visible = true;
         state.pinned = false;
         renderTabs();
+        // Restore hero scroll space for demo replay
+        const heroSeq = document.querySelector('.hero-sequence');
+        heroSeq.style.minHeight = '';
+        ScrollTrigger.refresh();
       }
 
       if (p > 0.02) { hotkeyHint.style.opacity = '0'; scrollHint.style.opacity = '0'; }
@@ -263,7 +267,13 @@ window.addEventListener('DOMContentLoaded', () => {
       else {
         const r = (p - 0.82) / 0.18;
         quake.style.transform = 'translateY(' + (-110 * r * r) + '%)';
-        if (p > 0.95) demoCompleted = true;
+        if (p > 0.95 && !demoCompleted) {
+          demoCompleted = true;
+          // Collapse hero scroll space so scrolling back is short
+          const heroSeq = document.querySelector('.hero-sequence');
+          heroSeq.style.minHeight = '100vh';
+          ScrollTrigger.refresh();
+        }
       }
 
       // Typing progress
