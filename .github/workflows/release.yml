@@ -41,7 +41,7 @@ jobs:
         run: ./scripts/download-ghosttykit.sh
 
       - name: Build release binary
-        run: swift build --build-system xcode -c release
+        run: swift build --build-system xcode -c release --arch arm64
 
       - name: Prepare app bundle
         run: |
