@@ -7,12 +7,18 @@ struct MacuakeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     static func main() {
+        // Prevent multiple instances
+        let runningApps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.maquake.app")
+        if runningApps.count > 1 {
+            // Another instance is already running — activate it and exit
+            runningApps.first(where: { $0 != .current })?.activate()
+            exit(0)
+        }
         MacuakeApp.startApp()
     }
 
     /// Launch the standard SwiftUI app lifecycle.
     private static func startApp() {
-        // This calls the synthesized App.main() via SwiftUI
         _startApp()
     }
 

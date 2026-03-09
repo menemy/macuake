@@ -41,7 +41,7 @@ jobs:
         run: ./scripts/download-ghosttykit.sh
 
       - name: Build release binary
-        run: swift build -c release --arch arm64 --arch x86_64
+        run: swift build --build-system xcode -c release
 
       - name: Prepare app bundle
         run: |
@@ -58,14 +58,15 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" \
             MaQuake/Resources/Info.plist
 
-          # Copy binary (universal build outputs to .build/apple/Products/Release/)
+          # Copy binary (--build-system xcode outputs to .build/apple/Products/Release/)
           cp .build/apple/Products/Release/${{ env.APP_NAME }} "$APP_BUNDLE/Contents/MacOS/${{ env.APP_NAME }}"
 
           # Copy Info.plist and icon
           cp MaQuake/Resources/Info.plist "$APP_BUNDLE/Contents/Info.plist"
           cp MaQuake/Resources/maquake.icns "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
 
-          # Copy SPM resource bundles (universal build accessor checks Contents/Resources/)
+          # Copy SPM resource bundles to Contents/Resources/
+          # --build-system xcode generates accessor that checks Bundle.main.resourceURL
           for bundle in .build/apple/Products/Release/*.bundle; do
               [ -d "$bundle" ] || continue
               [ -f "$bundle/Info.plist" ] || [ -f "$bundle/Contents/Info.plist" ] || continue

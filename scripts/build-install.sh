@@ -14,7 +14,7 @@ SIGNING_IDENTITY="Developer ID Application: Denti.AI Technology Inc (45N4N4R4C3)
 cd "$PROJECT_ROOT"
 
 echo "==> Building universal release (arm64 + x86_64)..."
-swift build -c release --arch arm64 --arch x86_64
+swift build --build-system xcode -c release --arch arm64 --arch x86_64
 
 echo "==> Copying binary..."
 cp .build/apple/Products/Release/Macuake "$BINARY"
@@ -35,9 +35,6 @@ for bundle in .build/apple/Products/Release/*.bundle; do
     name="$(basename "$bundle")"
     rm -rf "$RESOURCES_DIR/$name"
     cp -R "$bundle" "$RESOURCES_DIR/$name"
-    # SPM resource accessor looks next to binary
-    rm -rf "$APP_BUNDLE/Contents/MacOS/$name"
-    cp -R "$bundle" "$APP_BUNDLE/Contents/MacOS/$name"
     echo "    $name"
 done
 
@@ -55,11 +52,31 @@ fi
 echo "==> Fixing rpath for embedded frameworks..."
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$BINARY" 2>/dev/null || true
 
-echo "==> Signing with: $SIGNING_IDENTITY"
+echo "==> Signing (inside-out) with: $SIGNING_IDENTITY"
+
+# Sign resource bundles in Resources/
+for bundle in "$APP_BUNDLE"/Contents/Resources/*.bundle; do
+    [ -d "$bundle" ] || continue
+    codesign --force --sign "$SIGNING_IDENTITY" "$bundle"
+done
+
+# Sign Sparkle components inside-out
+codesign --force --sign "$SIGNING_IDENTITY" --options runtime \
+    "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc"
+codesign --force --sign "$SIGNING_IDENTITY" --options runtime \
+    "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc"
+codesign --force --sign "$SIGNING_IDENTITY" --options runtime \
+    "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"
+codesign --force --sign "$SIGNING_IDENTITY" --options runtime \
+    "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app"
+codesign --force --sign "$SIGNING_IDENTITY" --options runtime \
+    "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+
+# Sign main app bundle last
 codesign --force --sign "$SIGNING_IDENTITY" \
     --options runtime \
     --entitlements "$ENTITLEMENTS" \
-    --deep "$APP_BUNDLE"
+    "$APP_BUNDLE"
 
 codesign --verify --deep --strict "$APP_BUNDLE"
 echo "==> Signed and verified: $APP_BUNDLE"
