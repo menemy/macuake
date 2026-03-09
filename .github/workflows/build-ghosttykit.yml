@@ -46,9 +46,9 @@ jobs:
         if: steps.check-release.outputs.exists == 'false'
         run: brew install zig
 
-      - name: Build GhosttyKit.xcframework
+      - name: Build GhosttyKit.xcframework (universal)
         if: steps.check-release.outputs.exists == 'false'
-        run: ./scripts/build-ghostty.sh
+        run: ./scripts/build-ghostty.sh --universal
 
       - name: Package xcframework
         if: steps.check-release.outputs.exists == 'false'
