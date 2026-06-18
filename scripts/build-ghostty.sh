@@ -120,10 +120,49 @@ for ios_dir in "$XCFRAMEWORK_DIR"/ios-*/; do
     echo "Removing $(basename "$ios_dir") (macOS-only project)..."
     rm -rf "$ios_dir"
 done
-# Update Info.plist to remove iOS library entries
-if command -v plutil &>/dev/null; then
-    plutil -remove AvailableLibraries.0 "$XCFRAMEWORK_DIR/Info.plist" 2>/dev/null || true
-    plutil -remove AvailableLibraries.0 "$XCFRAMEWORK_DIR/Info.plist" 2>/dev/null || true
+# Rewrite Info.plist to only contain the macOS library
+PLIST="$XCFRAMEWORK_DIR/Info.plist"
+MACOS_DIR=$(ls -d "$XCFRAMEWORK_DIR"/macos-* 2>/dev/null | head -1)
+if [ -n "$MACOS_DIR" ]; then
+    MACOS_ID=$(basename "$MACOS_DIR")
+    LIB_FILE=$(ls "$MACOS_DIR"/*.a 2>/dev/null | head -1)
+    LIB_NAME=$(basename "$LIB_FILE")
+    ARCHS=$(lipo -info "$LIB_FILE" 2>/dev/null | grep -oE 'arm64|x86_64' | sort -u || true)
+    ARCH_XML=""
+    for a in $ARCHS; do
+        ARCH_XML="$ARCH_XML<string>$a</string>"
+    done
+    cat > "$PLIST" <<PLISTEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AvailableLibraries</key>
+	<array>
+		<dict>
+			<key>BinaryPath</key>
+			<string>$LIB_NAME</string>
+			<key>HeadersPath</key>
+			<string>Headers</string>
+			<key>LibraryIdentifier</key>
+			<string>$MACOS_ID</string>
+			<key>LibraryPath</key>
+			<string>$LIB_NAME</string>
+			<key>SupportedArchitectures</key>
+			<array>
+				$ARCH_XML
+			</array>
+			<key>SupportedPlatform</key>
+			<string>macos</string>
+		</dict>
+	</array>
+	<key>CFBundlePackageType</key>
+	<string>XFWK</string>
+	<key>XCFrameworkFormatVersion</key>
+	<string>1.0</string>
+</dict>
+</plist>
+PLISTEOF
 fi
 
 for lib_dir in "$XCFRAMEWORK_DIR"/*/; do
