@@ -38,6 +38,12 @@ for bundle in .build/apple/Products/Release/*.bundle; do
     echo "    $name"
 done
 
+echo "==> Removing stale bundles from app root..."
+for bundle in "$APP_BUNDLE"/*.bundle; do
+    [ -d "$bundle" ] || continue
+    rm -rf "$bundle"
+done
+
 echo "==> Embedding Sparkle.framework..."
 FRAMEWORKS_DIR="$APP_BUNDLE/Contents/Frameworks"
 mkdir -p "$FRAMEWORKS_DIR"
@@ -81,12 +87,15 @@ codesign --force --sign "$SIGNING_IDENTITY" \
 codesign --verify --deep --strict "$APP_BUNDLE"
 echo "==> Signed and verified: $APP_BUNDLE"
 
-# Always install: kill running instance, force-replace, relaunch
-echo "==> Installing to /Applications..."
-killall Macuake 2>/dev/null || true
+# Install as Macuake_dev.app to avoid conflicting with brew-installed Macuake.app
+INSTALL_NAME="Macuake_dev"
+echo "==> Installing to /Applications/${INSTALL_NAME}.app..."
+killall "$INSTALL_NAME" 2>/dev/null || true
 sleep 0.3
-rm -rf /Applications/Macuake.app
-cp -R "$APP_BUNDLE" /Applications/Macuake.app
-echo "==> Installed: /Applications/Macuake.app"
+rm -rf "/Applications/${INSTALL_NAME}.app"
+cp -R "$APP_BUNDLE" "/Applications/${INSTALL_NAME}.app"
+mv "/Applications/${INSTALL_NAME}.app/Contents/MacOS/Macuake" "/Applications/${INSTALL_NAME}.app/Contents/MacOS/${INSTALL_NAME}"
+/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable ${INSTALL_NAME}" "/Applications/${INSTALL_NAME}.app/Contents/Info.plist"
+echo "==> Installed: /Applications/${INSTALL_NAME}.app"
 
 echo "Done."

@@ -104,9 +104,8 @@ final class GhosttyApp: @unchecked Sendable {
 
         runtimeConfig.read_clipboard_cb = { _, _, state in
             let contents = NSPasteboard.general.string(forType: .string) ?? ""
-            // Must find the surface to complete the request — route via app userdata
-            // For now, complete on the first available backend
             GhosttyApp.shared.completeClipboardRead(contents: contents, state: state)
+            return true
         }
 
         runtimeConfig.confirm_read_clipboard_cb = { _, _, state, _ in
