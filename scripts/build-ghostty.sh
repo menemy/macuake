@@ -60,10 +60,14 @@ fi
 # 8-byte aligned; zig 0.15.x emits misaligned objects. Rebuild each
 # platform library from the intermediate .a files using ar (no alignment check).
 
-# Helper: rebuild a single-arch .a from zig-cache archives matching $1 (arch filter)
+# Helper: rebuild a single-arch .a from zig-cache archives
+# $1 = target arch (arm64/x86_64, empty = any)
+# $2 = output .a file
+# $3 = target platform numeric (1=MACOS, 2=IOS, 7=IOSSIMULATOR, empty = any)
 rebuild_from_cache() {
     local target_arch="$1"
     local out_file="$2"
+    local target_platform="$3"
     local merge_dir
     merge_dir=$(mktemp -d)
 
@@ -75,10 +79,16 @@ rebuild_from_cache() {
         # Skip fat (multi-arch) files — ar can't extract them
         arch_count=$(lipo -info "$archive" 2>/dev/null | grep -oE 'arm64|x86_64' | wc -l | tr -d ' ')
         [ "$arch_count" -gt 1 ] && continue
-        # Filter by architecture if specified
+        # Filter by architecture
         if [ -n "$target_arch" ]; then
             file_arch=$(lipo -info "$archive" 2>/dev/null | grep -oE 'arm64|x86_64' | head -1 || true)
             [ "$file_arch" = "$target_arch" ] || continue
+        fi
+        # Filter by platform via LC_BUILD_VERSION (1=MACOS, 2=IOS, 7=IOSSIMULATOR)
+        if [ -n "$target_platform" ]; then
+            file_platform=$( (otool -l "$archive" 2>/dev/null || true) | awk '/^ *platform /{print $2; exit}' )
+            [ -z "$file_platform" ] && continue
+            [ "$file_platform" = "$target_platform" ] || continue
         fi
         SUB=$(mktemp -d)
         (cd "$SUB" && ar x "$archive" && chmod 644 *.o 2>/dev/null || true)
@@ -92,20 +102,40 @@ rebuild_from_cache() {
 
     local obj_count
     obj_count=$(ls "$merge_dir"/*.o 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$obj_count" -eq 0 ]; then
+        echo "    ${target_arch:-all} ($target_platform): WARNING no objects found"
+        rm -rf "$merge_dir"
+        return 1
+    fi
     ar rcs "$out_file" "$merge_dir"/*.o
     ranlib "$out_file"
     rm -rf "$merge_dir"
-    echo "    $target_arch: $obj_count objects"
+    echo "    ${target_arch:-all} ($target_platform): $obj_count objects"
 }
 
+# Remove iOS slices — macuake is macOS only, and iOS objects
+# would contaminate the macOS library during rebuild
+for ios_dir in "$XCFRAMEWORK_DIR"/ios-*/; do
+    [ -d "$ios_dir" ] || continue
+    echo "Removing $(basename "$ios_dir") (macOS-only project)..."
+    rm -rf "$ios_dir"
+done
+# Update Info.plist to remove iOS library entries
+if command -v plutil &>/dev/null; then
+    plutil -remove AvailableLibraries.0 "$XCFRAMEWORK_DIR/Info.plist" 2>/dev/null || true
+    plutil -remove AvailableLibraries.0 "$XCFRAMEWORK_DIR/Info.plist" 2>/dev/null || true
+fi
+
 for lib_dir in "$XCFRAMEWORK_DIR"/*/; do
+    dir_name=$(basename "$lib_dir")
+
     # Handle single-arch libghostty-fat.a
     fat_lib="$lib_dir/libghostty-fat.a"
     if [ -f "$fat_lib" ]; then
         sym_count=$(nm "$fat_lib" 2>/dev/null | grep -c " T _ghostty_app_new" || true)
         if [ "$sym_count" -eq 0 ]; then
-            echo "Rebuilding $(basename "$lib_dir")/libghostty-fat.a (libtool dropped misaligned objects)..."
-            rebuild_from_cache "" "$fat_lib"
+            echo "Rebuilding $dir_name/libghostty-fat.a (libtool dropped misaligned objects)..."
+            rebuild_from_cache "" "$fat_lib" "1"
             ghostty_syms=$(nm "$fat_lib" 2>/dev/null | grep -c ' T _ghostty' || echo 0)
             echo "  Done: $ghostty_syms ghostty symbols"
         fi
@@ -116,11 +146,11 @@ for lib_dir in "$XCFRAMEWORK_DIR"/*/; do
     if [ -f "$lipo_lib" ]; then
         sym_count=$(nm "$lipo_lib" 2>/dev/null | grep -c " T _ghostty_app_new" || true)
         if [ "$sym_count" -eq 0 ]; then
-            echo "Rebuilding $(basename "$lib_dir")/libghostty.a (libtool dropped misaligned objects)..."
+            echo "Rebuilding $dir_name/libghostty.a (libtool dropped misaligned objects)..."
             WORK_DIR=$(mktemp -d)
             archs=$(lipo -info "$lipo_lib" 2>/dev/null | grep -oE 'arm64|x86_64' | sort -u || true)
             for arch in $archs; do
-                rebuild_from_cache "$arch" "$WORK_DIR/lib-$arch.a"
+                rebuild_from_cache "$arch" "$WORK_DIR/lib-$arch.a" "1"
             done
             lipo_args=""
             for arch in $archs; do
