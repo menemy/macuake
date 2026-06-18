@@ -6,7 +6,7 @@ struct TabBarView: View {
     @ObservedObject var windowController: WindowController
     @State private var showTabList = false
     @State private var tabsOverflow = false
-    @State private var draggedTabID: UUID?
+    @State private var draggedTabID: String?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -16,11 +16,18 @@ struct TabBarView: View {
                         HStack(spacing: 1) {
                             ForEach(Array(tabManager.tabs.enumerated()), id: \.element.id) { index, tab in
                                 TabItemView(
+                                    tabID: tab.id,
                                     index: index + 1,
                                     title: shortTitle(tab.displayTitle),
                                     kind: tab.kind,
                                     isActive: index == tabManager.activeTabIndex,
                                     hasCustomTitle: tab.customTitle != nil,
+                                    isEditing: Binding(
+                                        get: { tabManager.editingTabID == tab.id },
+                                        set: { editing in
+                                            tabManager.editingTabID = editing ? tab.id : nil
+                                        }
+                                    ),
                                     onSelect: {
                                         tabManager.selectTab(at: index)
                                     },
@@ -35,7 +42,7 @@ struct TabBarView: View {
                                 .opacity(draggedTabID == tab.id ? 0.4 : 1.0)
                                 .onDrag {
                                     draggedTabID = tab.id
-                                    return NSItemProvider(object: tab.id.uuidString as NSString)
+                                    return NSItemProvider(object: tab.id as NSString)
                                 }
                                 .onDrop(of: [.text], delegate: TabDropDelegate(
                                     tabManager: tabManager,
@@ -140,18 +147,19 @@ func tabShortTitle(_ title: String) -> String {
 }
 
 struct TabItemView: View {
+    let tabID: String
     let index: Int
     let title: String
     let kind: Tab.TabKind
     let isActive: Bool
     let hasCustomTitle: Bool
+    @Binding var isEditing: Bool
     let onSelect: () -> Void
     let onClose: () -> Void
     let onRename: (String?) -> Void
     let onHover: (Bool) -> Void
 
     @State private var isHovered = false
-    @State private var isEditing = false
     @State private var editText = ""
     @FocusState private var fieldFocused: Bool
 
@@ -184,6 +192,12 @@ struct TabItemView: View {
                     .focused($fieldFocused)
                     .onExitCommand {
                         isEditing = false
+                    }
+                    .onChange(of: fieldFocused) {
+                        if !fieldFocused {
+                            onRename(editText.isEmpty ? nil : editText)
+                            isEditing = false
+                        }
                     }
                     .onAppear {
                         fieldFocused = true
@@ -402,8 +416,8 @@ struct TabListPopover: View {
 
 struct TabDropDelegate: DropDelegate {
     let tabManager: TabManager
-    let targetTabID: UUID
-    @Binding var draggedTabID: UUID?
+    let targetTabID: String
+    @Binding var draggedTabID: String?
 
     func performDrop(info: DropInfo) -> Bool {
         draggedTabID = nil

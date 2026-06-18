@@ -100,7 +100,7 @@ struct PanelContentView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             // Dismiss layer
             Color.clear
                 .contentShape(Rectangle())
@@ -163,7 +163,7 @@ struct PanelContentView: View {
 
                 Spacer()
             }
-            .frame(maxWidth: .infinity)
+            .frame(width: windowController.panelWidth > 0 ? windowController.panelWidth : nil)
         }
     }
 }

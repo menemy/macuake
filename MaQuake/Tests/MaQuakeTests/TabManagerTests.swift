@@ -84,7 +84,7 @@ struct TabManagerTests {
     @Test func closeTab_withInvalidID_doesNothing() {
         let manager = TabManager()
         let countBefore = manager.tabs.count
-        manager.closeTab(id: UUID())
+        manager.closeTab(id: "NONEXIST")
         #expect(manager.tabs.count == countBefore)
     }
 

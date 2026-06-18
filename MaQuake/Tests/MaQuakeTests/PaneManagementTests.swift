@@ -242,6 +242,81 @@ struct PaneIntegrationTests {
 
     @Test func backend_forInvalidID_returnsNil() {
         let pm = PaneManager()
-        #expect(pm.rootPane.backend(for: UUID()) == nil)
+        #expect(pm.rootPane.backend(for: "NONEXIST") == nil)
+    }
+
+    // MARK: - Resize splits
+
+    @Test func updateSplitRatio_changesRatio() throws {
+        let pm = PaneManager()
+        try #require(pm.splitFocusedPane(axis: .horizontal))
+
+        guard case .split(let splitID, _, _, _, let ratio) = pm.rootPane else {
+            Issue.record("Expected split root"); return
+        }
+        #expect(abs(ratio - 0.5) < 0.001)
+
+        pm.updateSplitRatio(splitID: splitID, ratio: 0.7)
+
+        if case .split(_, _, _, _, let newRatio) = pm.rootPane {
+            #expect(abs(newRatio - 0.7) < 0.001)
+        }
+    }
+
+    @Test func resizeFocusedSplit_growsFocusedPane() throws {
+        let pm = PaneManager()
+        let firstID = pm.focusedPaneID
+        try #require(pm.splitFocusedPane(axis: .horizontal))
+        // Focus is on second pane. Grow it by +0.1 → ratio decreases (second gets more space)
+        pm.resizeFocusedSplit(delta: 0.1)
+
+        if case .split(_, _, _, _, let ratio) = pm.rootPane {
+            #expect(ratio < 0.5, "Second pane growing means first pane's ratio shrinks")
+        }
+    }
+
+    @Test func resizeFocusedSplit_firstPane_growsRatio() throws {
+        let pm = PaneManager()
+        let firstID = pm.focusedPaneID
+        try #require(pm.splitFocusedPane(axis: .horizontal))
+        // Switch focus to first pane
+        pm.focusedPaneID = firstID
+        pm.resizeFocusedSplit(delta: 0.1)
+
+        if case .split(_, _, _, _, let ratio) = pm.rootPane {
+            #expect(ratio > 0.5, "First pane growing means ratio increases")
+        }
+    }
+
+    @Test func resizeFocusedSplit_singlePane_noOp() {
+        let pm = PaneManager()
+        // Should not crash with single pane
+        pm.resizeFocusedSplit(delta: 0.1)
+        #expect(pm.rootPane.leafCount == 1)
+    }
+
+    @Test func equalizeSplits_resetsAllRatios() throws {
+        let pm = PaneManager()
+        try #require(pm.splitFocusedPane(axis: .horizontal))
+
+        // Change ratio away from 0.5
+        if case .split(let splitID, _, _, _, _) = pm.rootPane {
+            pm.updateSplitRatio(splitID: splitID, ratio: 0.3)
+        }
+
+        pm.equalizeSplits()
+
+        if case .split(_, _, _, _, let ratio) = pm.rootPane {
+            #expect(abs(ratio - 0.5) < 0.001)
+        }
+    }
+
+    @Test func splitPane_customRatio_applied() throws {
+        let pm = PaneManager()
+        try #require(pm.splitFocusedPane(axis: .horizontal, ratio: 0.7))
+
+        if case .split(_, _, _, _, let ratio) = pm.rootPane {
+            #expect(abs(ratio - 0.7) < 0.001)
+        }
     }
 }
