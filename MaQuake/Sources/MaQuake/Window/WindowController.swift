@@ -388,8 +388,12 @@ final class WindowController: ObservableObject {
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)) {
+        if UserDefaults.standard.bool(forKey: "disableAnimation") {
             state = .visible
+        } else {
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)) {
+                state = .visible
+            }
         }
 
         // Focus the terminal view after show
@@ -401,13 +405,18 @@ final class WindowController: ObservableObject {
     func hide() {
         guard state == .visible else { return }
 
-        withAnimation(.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)) {
+        if UserDefaults.standard.bool(forKey: "disableAnimation") {
             state = .hidden
+        } else {
+            withAnimation(.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)) {
+                state = .hidden
+            }
         }
         panel.ignoresMouseEvents = true
 
-        // After spring animation settles — activate previous app
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        // After animation settles (or immediately) — activate previous app
+        let delay = UserDefaults.standard.bool(forKey: "disableAnimation") ? 0.05 : 0.5
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self, self.state == .hidden else { return }
             if let prev = self.previousApp, !prev.isTerminated {
                 prev.activate()
@@ -420,7 +429,7 @@ final class WindowController: ObservableObject {
     func updateHeightByDelta(_ pixelHeight: CGFloat) {
         let screen = resolvedScreen.frame
         let pct = Int((pixelHeight / screen.height) * 100)
-        let clamped = min(max(pct, 20), 90)
+        let clamped = min(max(pct, 20), 100)
         heightPercent = clamped
         savedHeightPercent = clamped
     }
@@ -441,7 +450,7 @@ final class WindowController: ObservableObject {
     }
 
     func setHeightPercent(_ percent: Int) {
-        heightPercent = min(max(percent, 20), 90)
+        heightPercent = min(max(percent, 20), 100)
         savedHeightPercent = heightPercent
     }
 
