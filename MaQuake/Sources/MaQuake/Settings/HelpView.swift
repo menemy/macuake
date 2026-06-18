@@ -1,10 +1,8 @@
 import SwiftUI
-import KeyboardShortcuts
 
 struct HelpView: View {
     private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     private let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "-"
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -41,7 +39,7 @@ struct HelpView: View {
                         shortcutRow("New tab", "⌘ T")
                         shortcutRow("Close tab", "⌘ W")
                         shortcutRow("Reopen closed tab", "⌘ ⇧ T")
-                        shortcutRow("Next / Previous tab", "⌘ ⇧ ]  /  ⌘ ⇧ [")
+                        shortcutRow("Next / Previous tab", "⌘ ⇧ ]  /  ⌘ ⇧ [  (configurable in Settings)")
                         shortcutRow("Go to tab 1–9", "⌘ 1 – ⌘ 9")
                         shortcutRow("Rename tab", "Double-click title")
                     }

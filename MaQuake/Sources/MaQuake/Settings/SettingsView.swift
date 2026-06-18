@@ -4,6 +4,8 @@ import KeyboardShortcuts
 
 extension KeyboardShortcuts.Name {
     static let toggleTerminal = Self("toggleTerminal", default: .init(.space, modifiers: .option))
+    static let nextTab = Self("nextTab", default: .init(.rightBracket, modifiers: [.command, .shift]))
+    static let previousTab = Self("previousTab", default: .init(.leftBracket, modifiers: [.command, .shift]))
 }
 
 struct SettingsView: View {
@@ -217,10 +219,23 @@ struct SettingsView: View {
                     .padding(8)
                 }
 
-                GroupBox("Hotkey") {
-                    HStack {
-                        KeyboardShortcuts.Recorder("Toggle Terminal:", name: .toggleTerminal)
-                        Spacer()
+                GroupBox("Keyboard") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            KeyboardShortcuts.Recorder("Toggle Terminal:", name: .toggleTerminal)
+                            Spacer()
+                        }
+                        HStack {
+                            KeyboardShortcuts.Recorder("Next Tab:", name: .nextTab)
+                            Spacer()
+                        }
+                        HStack {
+                            KeyboardShortcuts.Recorder("Previous Tab:", name: .previousTab)
+                            Spacer()
+                        }
+                        Text("Ctrl+Tab and ⌘1-9 are always available.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                     .padding(8)
                 }
