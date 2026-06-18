@@ -59,44 +59,79 @@ fi
 # Xcode 26 libtool (cctools_ld-1267) silently drops .o files that aren't
 # 8-byte aligned; zig 0.15.x emits misaligned objects. Rebuild each
 # platform library from the intermediate .a files using ar (no alignment check).
-for lib_dir in "$XCFRAMEWORK_DIR"/*/; do
-    fat_lib="$lib_dir/libghostty-fat.a"
-    [ -f "$fat_lib" ] || continue
 
-    fat_sym_count=$(nm "$fat_lib" 2>/dev/null | grep -c " T _ghostty_app_new" || true)
-    if [ "$fat_sym_count" -gt 0 ]; then
-        continue
-    fi
+# Helper: rebuild a single-arch .a from zig-cache archives matching $1 (arch filter)
+rebuild_from_cache() {
+    local target_arch="$1"
+    local out_file="$2"
+    local merge_dir
+    merge_dir=$(mktemp -d)
 
-    echo "Rebuilding $(basename "$lib_dir")/libghostty-fat.a (libtool dropped misaligned objects)..."
-    MERGE_DIR=$(mktemp -d)
-
-    # Extract all intermediate .a files from zig-cache, in order: dependencies first, ghostty last
     for archive in "$GHOSTTY_DIR"/.zig-cache/o/*/lib*.a; do
         [ -f "$archive" ] || continue
         base=$(basename "$archive")
-        # Skip the fat lib itself and shared lib stubs
         [ "$base" = "libghostty-fat.a" ] && continue
         echo "$base" | grep -q "libghostty-vt" && continue
-        # Extract to a subdir to avoid name collisions, then move with unique prefix
+        # Skip fat (multi-arch) files — ar can't extract them
+        arch_count=$(lipo -info "$archive" 2>/dev/null | grep -oE 'arm64|x86_64' | wc -l | tr -d ' ')
+        [ "$arch_count" -gt 1 ] && continue
+        # Filter by architecture if specified
+        if [ -n "$target_arch" ]; then
+            file_arch=$(lipo -info "$archive" 2>/dev/null | grep -oE 'arm64|x86_64' | head -1 || true)
+            [ "$file_arch" = "$target_arch" ] || continue
+        fi
         SUB=$(mktemp -d)
         (cd "$SUB" && ar x "$archive" && chmod 644 *.o 2>/dev/null || true)
         for obj in "$SUB"/*.o; do
             [ -f "$obj" ] || continue
             name=$(basename "$obj")
-            if [ ! -f "$MERGE_DIR/$name" ]; then
-                mv "$obj" "$MERGE_DIR/$name"
-            fi
+            [ ! -f "$merge_dir/$name" ] && mv "$obj" "$merge_dir/$name"
         done
         rm -rf "$SUB"
     done
 
-    obj_count=$(ls "$MERGE_DIR"/*.o 2>/dev/null | wc -l | tr -d ' ')
-    ar rcs "$fat_lib" "$MERGE_DIR"/*.o
-    ranlib "$fat_lib"
-    rm -rf "$MERGE_DIR"
-    ghostty_syms=$(nm "$fat_lib" 2>/dev/null | grep -c ' T _ghostty' || echo 0)
-    echo "  Done: $obj_count objects, $ghostty_syms ghostty symbols"
+    local obj_count
+    obj_count=$(ls "$merge_dir"/*.o 2>/dev/null | wc -l | tr -d ' ')
+    ar rcs "$out_file" "$merge_dir"/*.o
+    ranlib "$out_file"
+    rm -rf "$merge_dir"
+    echo "    $target_arch: $obj_count objects"
+}
+
+for lib_dir in "$XCFRAMEWORK_DIR"/*/; do
+    # Handle single-arch libghostty-fat.a
+    fat_lib="$lib_dir/libghostty-fat.a"
+    if [ -f "$fat_lib" ]; then
+        sym_count=$(nm "$fat_lib" 2>/dev/null | grep -c " T _ghostty_app_new" || true)
+        if [ "$sym_count" -eq 0 ]; then
+            echo "Rebuilding $(basename "$lib_dir")/libghostty-fat.a (libtool dropped misaligned objects)..."
+            rebuild_from_cache "" "$fat_lib"
+            ghostty_syms=$(nm "$fat_lib" 2>/dev/null | grep -c ' T _ghostty' || echo 0)
+            echo "  Done: $ghostty_syms ghostty symbols"
+        fi
+    fi
+
+    # Handle universal lipo'd libghostty.a
+    lipo_lib="$lib_dir/libghostty.a"
+    if [ -f "$lipo_lib" ]; then
+        sym_count=$(nm "$lipo_lib" 2>/dev/null | grep -c " T _ghostty_app_new" || true)
+        if [ "$sym_count" -eq 0 ]; then
+            echo "Rebuilding $(basename "$lib_dir")/libghostty.a (libtool dropped misaligned objects)..."
+            WORK_DIR=$(mktemp -d)
+            archs=$(lipo -info "$lipo_lib" 2>/dev/null | grep -oE 'arm64|x86_64' | sort -u || true)
+            for arch in $archs; do
+                rebuild_from_cache "$arch" "$WORK_DIR/lib-$arch.a"
+            done
+            lipo_args=""
+            for arch in $archs; do
+                lipo_args="$lipo_args $WORK_DIR/lib-$arch.a"
+            done
+            lipo -create $lipo_args -output "$lipo_lib"
+            rm -rf "$WORK_DIR"
+            ghostty_syms=$(nm "$lipo_lib" 2>/dev/null | grep -c ' T _ghostty' || echo 0)
+            echo "  Done: $ghostty_syms ghostty symbols"
+        fi
+    fi
 done
 
 echo "$CURRENT_SHA" > "$CACHE_FILE"
