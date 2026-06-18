@@ -16,8 +16,11 @@ if [ ! -d "$GHOSTTY_DIR/.git" ] && [ ! -f "$GHOSTTY_DIR/.git" ]; then
     exit 1
 fi
 
-if ! command -v zig &>/dev/null; then
-    echo "Error: zig not found. Install with: brew install zig"
+ZIG_015="$(brew --prefix zig@0.15 2>/dev/null)/bin/zig"
+if [ -x "$ZIG_015" ]; then
+    export PATH="$(dirname "$ZIG_015"):$PATH"
+elif ! command -v zig &>/dev/null; then
+    echo "Error: zig 0.15.x not found. Install with: brew install zig@0.15"
     exit 1
 fi
 
