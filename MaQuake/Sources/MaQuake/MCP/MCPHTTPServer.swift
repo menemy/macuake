@@ -299,11 +299,12 @@ final class MCPHTTPServer {
              inputSchema: .object(["type": .string("object"), "properties": .object([:])]) ),
         Tool(name: "unpin", description: "Unpin the terminal (auto-hide on focus loss)",
              inputSchema: .object(["type": .string("object"), "properties": .object([:])]) ),
-        Tool(name: "new_tab", description: "Create a new terminal tab, optionally in a given directory",
+        Tool(name: "new_tab", description: "Create a new terminal tab. Returns session_id of the new session.",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
-                    "directory": .object(["type": .string("string"), "description": .string("Working directory for the new tab")])
+                    "directory": .object(["type": .string("string"), "description": .string("Working directory for the new tab")]),
+                    "name": .object(["type": .string("string"), "description": .string("Tab title (overrides auto-detected title)")])
                 ])
              ])),
         Tool(name: "focus", description: "Focus a tab (by session_id/index), a pane (by pane_id), or navigate panes (direction: next/prev)",

@@ -197,6 +197,32 @@ struct ControlServerHandlerTests {
         #expect(wc.tabManager.tabs.count == 2)
     }
 
+    @Test func newTab_withName_setsCustomTitle() {
+        let (server, wc) = makeServer()
+        let result = server.handleRequest(json(["action": "new-tab", "name": "Dev Server"]))
+        let parsed = parse(result)
+        #expect(parsed?["ok"] as? Bool == true)
+        #expect(wc.tabManager.tabs.last?.customTitle == "Dev Server")
+        #expect(wc.tabManager.tabs.last?.displayTitle == "Dev Server")
+    }
+
+    @Test func newTab_withEmptyName_doesNotSetTitle() {
+        let (server, wc) = makeServer()
+        let result = server.handleRequest(json(["action": "new-tab", "name": ""]))
+        let parsed = parse(result)
+        #expect(parsed?["ok"] as? Bool == true)
+        #expect(wc.tabManager.tabs.last?.customTitle == nil)
+    }
+
+    @Test func newTab_withNameAndDirectory_setsBoth() {
+        let (server, wc) = makeServer()
+        let result = server.handleRequest(json(["action": "new-tab", "name": "Logs", "directory": "/tmp"]))
+        let parsed = parse(result)
+        #expect(parsed?["ok"] as? Bool == true)
+        #expect(wc.tabManager.tabs.last?.customTitle == "Logs")
+        #expect(wc.tabManager.tabs.count == 2)
+    }
+
     // MARK: - focus
 
     @Test func focus_bySessionID_selectsTab() {

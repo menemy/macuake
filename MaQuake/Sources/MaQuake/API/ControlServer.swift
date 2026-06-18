@@ -244,6 +244,9 @@ final class ControlServer {
         let dir = json["directory"] as? String
         wc.tabManager.addTab(in: dir)
         let tab = wc.tabManager.tabs.last!
+        if let name = json["name"] as? String, !name.isEmpty {
+            wc.tabManager.renameTab(id: tab.id, name: name)
+        }
         return jsonOK(["session_id": tab.id.uuidString])
     }
 
