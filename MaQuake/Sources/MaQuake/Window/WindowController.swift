@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import KeyboardShortcuts
 
 enum PanelState: Equatable {
     case hidden
@@ -222,6 +223,16 @@ final class WindowController: ObservableObject {
 
             guard cmd else { return event }
 
+            // Configurable next/prev tab shortcuts (via KeyboardShortcuts recorder)
+            if self.eventMatchesShortcut(event, for: .nextTab) {
+                self.tabManager.selectNextTab()
+                return nil
+            }
+            if self.eventMatchesShortcut(event, for: .previousTab) {
+                self.tabManager.selectPreviousTab()
+                return nil
+            }
+
             // ⌘1-8 → select tab N, ⌘9 → last tab (Chrome behavior)
             if !shift, let digit = Self.digitKeyCodes[key] {
                 if digit == 9 {
@@ -264,12 +275,6 @@ final class WindowController: ObservableObject {
             case Self.kVK_Comma where !shift:
                 self.openSettings()
                 return nil
-            case Self.kVK_LeftBracket where shift:
-                self.tabManager.selectPreviousTab()
-                return nil
-            case Self.kVK_RightBracket where shift:
-                self.tabManager.selectNextTab()
-                return nil
             case Self.kVK_LeftBracket where !shift:
                 // ⌘[ → previous pane
                 self.tabManager.moveFocusInActiveTab(.previous)
@@ -296,6 +301,16 @@ final class WindowController: ObservableObject {
 
             return event
         }
+    }
+
+    private func eventMatchesShortcut(_ event: NSEvent, for name: KeyboardShortcuts.Name) -> Bool {
+        guard let shortcut = KeyboardShortcuts.getShortcut(for: name) else { return false }
+        let keyMatch = event.keyCode == UInt16(shortcut.carbonKeyCode)
+        let modMatch = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            .subtracting(.numericPad)
+            .subtracting(.function)
+            == shortcut.modifiers.intersection(.deviceIndependentFlagsMask)
+        return keyMatch && modMatch
     }
 
     // MARK: - Mouse Monitors

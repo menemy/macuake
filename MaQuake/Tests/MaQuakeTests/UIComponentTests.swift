@@ -1,5 +1,6 @@
 import Testing
 import AppKit
+import KeyboardShortcuts
 @testable import Macuake
 
 /// Comprehensive UI component tests covering tab interactions, keyboard shortcuts,
@@ -89,6 +90,44 @@ struct UIComponentTests {
         #expect(wc.tabManager.activeTabIndex == 0)
     }
 
+    // MARK: - Tab switching (KeyboardShortcuts recorder)
+
+    @Test func tabSwitch_selectNextPrev_wrapsAround() {
+        let wc = makeController()
+        wc.tabManager.addTab()
+        wc.tabManager.addTab()
+        wc.tabManager.selectTab(at: 0)
+
+        wc.tabManager.selectNextTab()
+        #expect(wc.tabManager.activeTabIndex == 1)
+        wc.tabManager.selectNextTab()
+        #expect(wc.tabManager.activeTabIndex == 2)
+        wc.tabManager.selectNextTab()
+        #expect(wc.tabManager.activeTabIndex == 0)
+
+        wc.tabManager.selectPreviousTab()
+        #expect(wc.tabManager.activeTabIndex == 2)
+        wc.tabManager.selectPreviousTab()
+        #expect(wc.tabManager.activeTabIndex == 1)
+    }
+
+    @Test func tabSwitch_singleTab_doesNothing() {
+        let wc = makeController()
+        #expect(wc.tabManager.tabs.count == 1)
+        #expect(wc.tabManager.activeTabIndex == 0)
+
+        wc.tabManager.selectNextTab()
+        #expect(wc.tabManager.activeTabIndex == 0)
+        wc.tabManager.selectPreviousTab()
+        #expect(wc.tabManager.activeTabIndex == 0)
+    }
+
+    @Test func keyboardShortcutNames_areDefined() {
+        #expect(KeyboardShortcuts.Name.toggleTerminal.rawValue == "toggleTerminal")
+        #expect(KeyboardShortcuts.Name.nextTab.rawValue == "nextTab")
+        #expect(KeyboardShortcuts.Name.previousTab.rawValue == "previousTab")
+    }
+
     // MARK: - Tab creation (Cmd+T)
 
     @Test func cmdT_createsNewTab_andActivatesIt() {
@@ -176,7 +215,7 @@ struct UIComponentTests {
 
     @Test func renameTab_invalidID_doesNothing() {
         let wc = makeController()
-        let fakeID = UUID()
+        let fakeID = generateShortID()
         wc.tabManager.renameTab(id: fakeID, name: "Should Not Appear")
         #expect(wc.tabManager.tabs.allSatisfy { $0.customTitle == nil })
     }
@@ -707,13 +746,13 @@ struct PaneNodeTests {
 
     @Test func leaf_leafCount_isOne() {
         let instance = TerminalInstance()
-        let node = PaneNode.leaf(id: UUID(), backend: instance.backend)
+        let node = PaneNode.leaf(id: generateShortID(), backend: instance.backend)
         #expect(node.leafCount == 1)
         instance.terminate()
     }
 
     @Test func leaf_leafIDs_containsSelf() {
-        let id = UUID()
+        let id = generateShortID()
         let instance = TerminalInstance()
         let node = PaneNode.leaf(id: id, backend: instance.backend)
         #expect(node.leafIDs == [id])
@@ -721,11 +760,11 @@ struct PaneNodeTests {
     }
 
     @Test func leaf_instanceLookup() {
-        let id = UUID()
+        let id = generateShortID()
         let instance = TerminalInstance()
         let node = PaneNode.leaf(id: id, backend: instance.backend)
         #expect(node.backend(for: id) === instance.backend)
-        #expect(node.backend(for: UUID()) == nil)
+        #expect(node.backend(for: generateShortID()) == nil)
         instance.terminate()
     }
 
@@ -733,10 +772,10 @@ struct PaneNodeTests {
         let i1 = TerminalInstance()
         let i2 = TerminalInstance()
         let node = PaneNode.split(
-            id: UUID(),
+            id: generateShortID(),
             axis: .horizontal,
-            first: .leaf(id: UUID(), backend: i1.backend),
-            second: .leaf(id: UUID(), backend: i2.backend),
+            first: .leaf(id: generateShortID(), backend: i1.backend),
+            second: .leaf(id: generateShortID(), backend: i2.backend),
             ratio: 0.5
         )
         #expect(node.leafCount == 2)
@@ -745,12 +784,12 @@ struct PaneNodeTests {
     }
 
     @Test func split_leafIDs_containsBoth() {
-        let id1 = UUID()
-        let id2 = UUID()
+        let id1 = generateShortID()
+        let id2 = generateShortID()
         let i1 = TerminalInstance()
         let i2 = TerminalInstance()
         let node = PaneNode.split(
-            id: UUID(),
+            id: generateShortID(),
             axis: .horizontal,
             first: .leaf(id: id1, backend: i1.backend),
             second: .leaf(id: id2, backend: i2.backend),
