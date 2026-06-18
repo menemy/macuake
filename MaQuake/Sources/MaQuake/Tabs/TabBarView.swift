@@ -68,6 +68,10 @@ struct TabBarView: View {
                     .frame(minWidth: outerGeo.size.width, alignment: .leading)
                 }
             }
+            .overlay(DoubleClickCatcher { [weak tabManager] in
+                guard let tabManager, tabManager.hoveredTabIndex == nil else { return }
+                tabManager.addTab()
+            })
 
             // Tab list button — visible when tabs overflow
             if tabsOverflow {
@@ -128,10 +132,6 @@ struct TabBarView: View {
         .frame(height: 36)
         .background(Color.black.opacity(0.85))
         .environment(\.colorScheme, .dark)
-        .overlay(DoubleClickCatcher { [weak tabManager] in
-            guard let tabManager, tabManager.hoveredTabIndex == nil else { return }
-            tabManager.addTab()
-        })
         .contentShape(Rectangle())
     }
 
@@ -333,10 +333,6 @@ final class DoubleClickNSView: NSView {
                     // on tab items without reaching high-level views (e.g. dismiss gesture)
                     while let v = current, depth < 20 {
                         if v is MouseDownNSView || v is NSButton || v is NSTextField {
-                            return event
-                        }
-                        let className = String(describing: type(of: v))
-                        if className.contains("Button") {
                             return event
                         }
                         if v.gestureRecognizers.contains(where: { $0 is NSClickGestureRecognizer }) {
