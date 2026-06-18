@@ -92,9 +92,10 @@ rebuild_from_cache() {
         fi
         SUB=$(mktemp -d)
         (cd "$SUB" && ar x "$archive" && chmod 644 *.o 2>/dev/null || true)
+        local prefix="${base%.a}_"
         for obj in "$SUB"/*.o; do
             [ -f "$obj" ] || continue
-            name=$(basename "$obj")
+            name="${prefix}$(basename "$obj")"
             [ ! -f "$merge_dir/$name" ] && mv "$obj" "$merge_dir/$name"
         done
         rm -rf "$SUB"
