@@ -13,6 +13,9 @@ final class MCPHTTPServer {
     private var mcpServer: Server?
     private var transport: StatelessHTTPServerTransport?
     private weak var controlServer: ControlServer?
+    private var wakeObserver: Any?
+    private var restartAttempts = 0
+    private static let maxRestartAttempts = 5
 
     nonisolated static let defaultPort: UInt16 = 19876
 
@@ -55,13 +58,42 @@ final class MCPHTTPServer {
         }
 
         startListener()
+
+        // Restart listener after system wake from sleep
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("MCPHTTPServer: system wake — restarting listener")
+            self?.restartAttempts = 0
+            self?.restartListener()
+        }
     }
 
     func stop() {
+        if let obs = wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(obs)
+            wakeObserver = nil
+        }
         listener?.cancel()
         listener = nil
         Task {
             await transport?.disconnect()
+        }
+    }
+
+    private func restartListener() {
+        guard restartAttempts < Self.maxRestartAttempts else {
+            print("MCPHTTPServer: max restart attempts (\(Self.maxRestartAttempts)) reached — giving up")
+            return
+        }
+        restartAttempts += 1
+        listener?.cancel()
+        listener = nil
+        // Delay to let the port release
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.startListener()
         }
     }
 
@@ -78,12 +110,16 @@ final class MCPHTTPServer {
         }
 
         let capturedPort = port
-        listener?.stateUpdateHandler = { state in
+        listener?.stateUpdateHandler = { [weak self] state in
             switch state {
             case .ready:
+                DispatchQueue.main.async { self?.restartAttempts = 0 }
                 print("MCPHTTPServer: listening on http://localhost:\(capturedPort)/mcp")
             case .failed(let error):
-                print("MCPHTTPServer: listener failed: \(error)")
+                print("MCPHTTPServer: listener failed: \(error) — restarting")
+                DispatchQueue.main.async {
+                    self?.restartListener()
+                }
             default:
                 break
             }
@@ -280,13 +316,13 @@ final class MCPHTTPServer {
     // MARK: - Tool definitions
 
     nonisolated static let allTools: [Tool] = [
-        Tool(name: "state", description: "Get terminal state (visible, pinned, tab count, active tab, size)",
+        Tool(name: "state", description: "Get terminal state (visible, pinned, tab count, active session)",
              inputSchema: .object(["type": .string("object"), "properties": .object([:])]) ),
-        Tool(name: "list", description: "List all terminal tabs with session IDs, titles, working directories. Set include_panes=true to get pane tree.",
+        Tool(name: "list", description: "List tabs and sessions (panes). Each session has an 8-char session_id.",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
-                    "include_panes": .object(["type": .string("boolean"), "description": .string("Include pane tree structure for each tab (default: false)")])
+                    "include_panes": .object(["type": .string("boolean"), "description": .string("Include pane tree structure (default: false)")])
                 ])
              ])),
         Tool(name: "toggle", description: "Toggle terminal visibility (show/hide)",
@@ -307,81 +343,93 @@ final class MCPHTTPServer {
                     "name": .object(["type": .string("string"), "description": .string("Tab title (overrides auto-detected title)")])
                 ])
              ])),
-        Tool(name: "focus", description: "Focus a tab (by session_id/index), a pane (by pane_id), or navigate panes (direction: next/prev)",
+        Tool(name: "focus", description: "Focus a session (auto-switches tab), a tab (by tab_id/index), or navigate panes (direction: next/prev)",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
-                    "session_id": .object(["type": .string("string"), "description": .string("Tab session UUID")]),
+                    "session_id": .object(["type": .string("string"), "description": .string("Session (pane) ID — auto-switches to its tab")]),
+                    "tab_id": .object(["type": .string("string"), "description": .string("Tab container ID")]),
                     "index": .object(["type": .string("integer"), "description": .string("Tab index (0-based)")]),
-                    "pane_id": .object(["type": .string("string"), "description": .string("Pane UUID (from list with include_panes)")]),
                     "direction": .object(["type": .string("string"), "description": .string("Pane navigation: next or prev")])
                 ])
              ])),
-        Tool(name: "close_session", description: "Close a tab (by session_id) or a pane (by pane_id). Omit both to close active tab.",
+        Tool(name: "close_session", description: "Close a session (pane) or a tab. If last pane, tab closes too.",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
-                    "session_id": .object(["type": .string("string"), "description": .string("Tab session UUID")]),
-                    "pane_id": .object(["type": .string("string"), "description": .string("Pane UUID to close (closes pane, not whole tab)")])
+                    "session_id": .object(["type": .string("string"), "description": .string("Session (pane) ID to close")]),
+                    "tab_id": .object(["type": .string("string"), "description": .string("Tab ID to close (all panes)")])
                 ])
              ])),
-        Tool(name: "execute", description: "Execute a shell command in a terminal tab. Sends text and presses Enter.",
+        Tool(name: "execute", description: "Execute a shell command in a session. Sends text and presses Enter.",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
                     "command": .object(["type": .string("string"), "description": .string("Shell command to execute")]),
-                    "session_id": .object(["type": .string("string"), "description": .string("Target tab (default: active)")])
+                    "session_id": .object(["type": .string("string"), "description": .string("Target session (default: focused)")])
                 ]),
                 "required": .array([.string("command")])
              ])),
-        Tool(name: "read", description: "Read terminal output (last N lines from the screen buffer)",
+        Tool(name: "read", description: "Read terminal output from a session (last N lines)",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
-                    "session_id": .object(["type": .string("string"), "description": .string("Target tab (default: active)")]),
+                    "session_id": .object(["type": .string("string"), "description": .string("Target session (default: focused)")]),
                     "lines": .object(["type": .string("integer"), "description": .string("Number of lines to read (default: 20)")])
                 ])
              ])),
-        Tool(name: "paste", description: "Paste text into the terminal (no Enter key appended)",
+        Tool(name: "paste", description: "Paste text into a session (no Enter key appended)",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
                     "text": .object(["type": .string("string"), "description": .string("Text to paste")]),
-                    "session_id": .object(["type": .string("string"), "description": .string("Target tab (default: active)")])
+                    "session_id": .object(["type": .string("string"), "description": .string("Target session (default: focused)")])
                 ]),
                 "required": .array([.string("text")])
              ])),
-        Tool(name: "control_char", description: "Send a control character (ctrl+c, ctrl+d, enter, esc, tab, etc.)",
+        Tool(name: "control_char", description: "Send a control character to a session (ctrl+c, ctrl+d, enter, esc, tab, etc.)",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
                     "key": .object(["type": .string("string"), "description": .string("Key: c, d, z, a, e, k, l, u, w, enter, esc, tab")]),
-                    "session_id": .object(["type": .string("string"), "description": .string("Target tab (default: active)")])
+                    "session_id": .object(["type": .string("string"), "description": .string("Target session (default: focused)")])
                 ]),
                 "required": .array([.string("key")])
              ])),
-        Tool(name: "clear", description: "Clear the terminal screen (sends Ctrl+L)",
+        Tool(name: "clear", description: "Clear a session screen (sends Ctrl+L)",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
-                    "session_id": .object(["type": .string("string"), "description": .string("Target tab (default: active)")])
+                    "session_id": .object(["type": .string("string"), "description": .string("Target session (default: focused)")])
                 ])
              ])),
-        Tool(name: "split", description: "Split the focused pane horizontally or vertically",
+        Tool(name: "split", description: "Split a session horizontally or vertically. Returns new session_id.",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
                     "direction": .object(["type": .string("string"), "description": .string("Split direction: h (horizontal) or v (vertical)")]),
-                    "session_id": .object(["type": .string("string"), "description": .string("Target tab (default: active)")])
+                    "session_id": .object(["type": .string("string"), "description": .string("Session to split (default: focused)")]),
+                    "ratio": .object(["type": .string("number"), "description": .string("Split ratio 0.1-0.9 for first pane (default: 0.5)")])
                 ]),
                 "required": .array([.string("direction")])
              ])),
-        Tool(name: "set_appearance", description: "Set tab title",
+        Tool(name: "resize_split", description: "Resize a split pane. Set absolute ratio, delta, or equalize all splits.",
+             inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "ratio": .object(["type": .string("number"), "description": .string("Absolute ratio 0.1-0.9 for parent split")]),
+                    "delta": .object(["type": .string("number"), "description": .string("Resize by delta percentage points (e.g. 10 = grow 10%)")]),
+                    "equalize": .object(["type": .string("boolean"), "description": .string("Set all splits to equal ratio")]),
+                    "session_id": .object(["type": .string("string"), "description": .string("Target session (default: focused)")])
+                ])
+             ])),
+        Tool(name: "set_appearance", description: "Set tab title (by tab_id, session_id, or active tab)",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
                     "title": .object(["type": .string("string"), "description": .string("New tab title (empty to reset)")]),
-                    "session_id": .object(["type": .string("string"), "description": .string("Target tab (default: active)")])
+                    "tab_id": .object(["type": .string("string"), "description": .string("Tab ID")]),
+                    "session_id": .object(["type": .string("string"), "description": .string("Session ID (resolves to its tab)")])
                 ]),
                 "required": .array([.string("title")])
              ])),
@@ -432,19 +480,19 @@ final class MCPHTTPServer {
             "new_tab": "new-tab", "focus": "focus", "close_session": "close-session",
             "execute": "execute", "read": "read", "paste": "paste",
             "control_char": "control-char", "clear": "clear", "split": "split",
-            "set_appearance": "set-appearance",
+            "resize_split": "resize-split", "set_appearance": "set-appearance",
         ]
 
         guard let action = actionMap[params.name] else {
             throw MCPError.invalidParams("Unknown tool: \(params.name)")
         }
 
-        // Map MCP argument names to ControlServer JSON keys.
-        // Most use underscore→dash, but session_id stays as-is (ControlServer expects underscore).
+        // Map MCP argument names (snake_case) to ControlServer JSON keys.
         let keyMap: [String: String] = [
             "include_panes": "include-panes",
-            "pane_id": "pane-id",
             "session_id": "session_id",
+            "tab_id": "tab_id",
+            "close_session": "close-session",
         ]
 
         var request: [String: Any] = ["action": action]

@@ -149,7 +149,7 @@ private enum SocketError: Error, CustomStringConvertible {
 
 /// Generate a unique temporary socket path for each test to avoid conflicts.
 private func uniqueSocketPath() -> String {
-    "/tmp/macuake-test-\(UUID().uuidString).sock"
+    "/tmp/macuake-test-\(generateShortID()).sock"
 }
 
 /// Small delay to let the socket server start accepting connections.
@@ -332,10 +332,10 @@ struct ControlServerIntegrationTests {
         defer { server.stop() }
 
         _ = try await sendCommand(["action": "new-tab"], socketPath: path)
-        let firstTabSessionID = wc.tabManager.tabs[0].id.uuidString
+        let firstPaneID = wc.tabManager.tabs[0].paneManager!.focusedPaneID
 
         let response = try await sendCommand(
-            ["action": "focus", "session_id": firstTabSessionID],
+            ["action": "focus", "session_id": firstPaneID],
             socketPath: path
         )
         #expect(response["ok"] as? Bool == true)
@@ -347,7 +347,7 @@ struct ControlServerIntegrationTests {
         defer { server.stop() }
 
         let response = try await sendCommand(
-            ["action": "focus", "session_id": UUID().uuidString],
+            ["action": "focus", "session_id": generateShortID()],
             socketPath: path
         )
         #expect(response["ok"] as? Bool == false)
@@ -363,9 +363,9 @@ struct ControlServerIntegrationTests {
         _ = try await sendCommand(["action": "new-tab"], socketPath: path)
         #expect(wc.tabManager.tabs.count == 2)
 
-        let sessionID = wc.tabManager.tabs[1].id.uuidString
+        let tabID = wc.tabManager.tabs[1].id
         let response = try await sendCommand(
-            ["action": "close-session", "session_id": sessionID],
+            ["action": "close-session", "tab_id": tabID],
             socketPath: path
         )
         #expect(response["ok"] as? Bool == true)
@@ -793,7 +793,7 @@ struct ControlServerExecuteReadTests {
         let (server, wc, path) = try await makeServerAndController()
         defer { server.stop() }
 
-        let sessionID = wc.tabManager.tabs[0].id.uuidString
+        let sessionID = wc.tabManager.tabs[0].paneManager!.focusedPaneID
 
         let response = try await sendCommand(
             ["action": "execute", "command": "pwd", "session_id": sessionID],
@@ -864,7 +864,7 @@ struct ControlServerExecuteReadTests {
         defer { server.stop() }
 
         let response = try await sendCommand(
-            ["action": "read", "session_id": UUID().uuidString],
+            ["action": "read", "session_id": generateShortID()],
             socketPath: path
         )
         #expect(response["ok"] as? Bool == false)

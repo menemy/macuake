@@ -17,6 +17,7 @@ final class WindowController: ObservableObject {
     @Published var displayID: Int = 0
     @Published var widthPercent: Int = 75
     @Published var heightPercent: Int = 50
+    @Published var panelWidth: CGFloat = 0
 
     private var previousApp: NSRunningApplication?
     private var resignObserver: Any?
@@ -124,6 +125,7 @@ final class WindowController: ObservableObject {
             width: screen.width,
             height: screen.height
         ), display: true)
+        panelWidth = screen.width
     }
 
     // MARK: - Observers
@@ -403,16 +405,20 @@ final class WindowController: ObservableObject {
         panel.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
-        if UserDefaults.standard.bool(forKey: "disableAnimation") {
-            state = .visible
-        } else {
-            withAnimation(.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)) {
+        // Defer animation by one run loop tick so the SwiftUI hosting view
+        // picks up the new panel frame. Without this, switching monitors
+        // shows content sized/centered for the previous screen.
+        DispatchQueue.main.async { [self] in
+            if UserDefaults.standard.bool(forKey: "disableAnimation") {
                 state = .visible
+            } else {
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)) {
+                    state = .visible
+                }
             }
-        }
 
-        // Focus the terminal view after show
-        tabManager.focusTerminalInActiveTab()
+            tabManager.focusTerminalInActiveTab()
+        }
 
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
     }

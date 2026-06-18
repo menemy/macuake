@@ -40,7 +40,13 @@ SUITES=(
     ScreenDetectorExtendedTests
     WindowControllerResizeTests
     WindowControllerLifecycleTests
-    UIComponentTests
+    UIComponentTests/
+    WindowControllerSettingsHelpTests
+    TabCloseEdgeCaseTests
+    TabReorderingTests
+    TabStatePersistenceTests
+    CloseConfirmationTests
+    PinnedWindowVisibilityTests
     TabManagerTerminalIntegrationTests
     WindowControllerTabManagerIntegrationTests
     MaquakeE2ETests

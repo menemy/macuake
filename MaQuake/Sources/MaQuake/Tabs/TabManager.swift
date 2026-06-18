@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 struct Tab: Identifiable {
-    let id: UUID
+    let id: String
     let kind: TabKind
     let paneManager: PaneManager?
     var title: String
@@ -25,7 +25,7 @@ struct Tab: Identifiable {
 
     /// Terminal tab
     init(directory: String? = nil) {
-        self.id = UUID()
+        self.id = generateShortID()
         self.kind = .terminal
         self.paneManager = PaneManager(directory: directory)
         self.title = "zsh"
@@ -33,7 +33,7 @@ struct Tab: Identifiable {
 
     /// Special tab (settings, help)
     init(kind: TabKind, title: String) {
-        self.id = UUID()
+        self.id = generateShortID()
         self.kind = kind
         self.paneManager = nil
         self.title = title
@@ -45,6 +45,7 @@ final class TabManager: ObservableObject {
     @Published var tabs: [Tab] = []
     @Published var activeTabIndex: Int = 0
     @Published var hoveredTabIndex: Int? = nil
+    @Published var editingTabID: String? = nil
 
     /// Stack of directories from recently closed tabs (for ⌘⇧T reopen)
     private var closedTabDirectories: [String] = []
@@ -101,7 +102,7 @@ final class TabManager: ObservableObject {
         focusTerminalInActiveTab()
     }
 
-    func closeTab(id: UUID) {
+    func closeTab(id: String) {
         guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
 
         // Save directory for ⌘⇧T reopen (terminal tabs only)
@@ -133,7 +134,7 @@ final class TabManager: ObservableObject {
         !closedTabDirectories.isEmpty
     }
 
-    func renameTab(id: UUID, name: String?) {
+    func renameTab(id: String, name: String?) {
         guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
         tabs[index].customTitle = (name?.isEmpty ?? true) ? nil : name
     }
@@ -161,7 +162,11 @@ final class TabManager: ObservableObject {
 
     func openSettings() {
         if let idx = tabs.firstIndex(where: { $0.kind == .settings }) {
-            selectTab(at: idx)
+            if activeTabIndex == idx {
+                closeTab(id: tabs[idx].id)
+            } else {
+                selectTab(at: idx)
+            }
             return
         }
         let tab = Tab(kind: .settings, title: "Settings")
@@ -171,7 +176,11 @@ final class TabManager: ObservableObject {
 
     func openHelp() {
         if let idx = tabs.firstIndex(where: { $0.kind == .help }) {
-            selectTab(at: idx)
+            if activeTabIndex == idx {
+                closeTab(id: tabs[idx].id)
+            } else {
+                selectTab(at: idx)
+            }
             return
         }
         let tab = Tab(kind: .help, title: "Help")

@@ -28,6 +28,9 @@ struct PaneSplitView: View {
         explicitNode ?? paneManager.rootPane
     }
 
+    /// Minimum pane size in points.
+    private let minPaneSize: CGFloat = 40
+
     var body: some View {
         switch node {
         case .leaf(let id, let backend):
@@ -70,31 +73,91 @@ struct PaneSplitView: View {
                 }
             }
 
-        case .split(_, let axis, let first, let second, let ratio):
+        case .split(let splitID, let axis, let first, let second, let ratio):
             GeometryReader { geo in
                 if axis == .horizontal {
+                    let firstWidth = (geo.size.width - 1) * ratio
                     HStack(spacing: 0) {
                         PaneSplitView(node: first, paneManager: paneManager, tabManager: tabManager, theme: theme)
-                            .frame(width: (geo.size.width - 1) * ratio)
+                            .frame(width: firstWidth)
 
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.4))
-                            .frame(width: 1)
+                        SplitDivider(axis: .horizontal)
+                            .gesture(DragGesture()
+                                .onChanged { value in
+                                    let newRatio = value.location.x / geo.size.width
+                                    let clamped = min(max(newRatio, minPaneSize / geo.size.width), 1 - minPaneSize / geo.size.width)
+                                    paneManager.updateSplitRatio(splitID: splitID, ratio: clamped)
+                                }
+                            )
+                            .onTapGesture(count: 2) {
+                                paneManager.updateSplitRatio(splitID: splitID, ratio: 0.5)
+                            }
 
                         PaneSplitView(node: second, paneManager: paneManager, tabManager: tabManager, theme: theme)
                     }
                 } else {
+                    let firstHeight = (geo.size.height - 1) * ratio
                     VStack(spacing: 0) {
                         PaneSplitView(node: first, paneManager: paneManager, tabManager: tabManager, theme: theme)
-                            .frame(height: (geo.size.height - 1) * ratio)
+                            .frame(height: firstHeight)
 
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.4))
-                            .frame(height: 1)
+                        SplitDivider(axis: .vertical)
+                            .gesture(DragGesture()
+                                .onChanged { value in
+                                    let newRatio = value.location.y / geo.size.height
+                                    let clamped = min(max(newRatio, minPaneSize / geo.size.height), 1 - minPaneSize / geo.size.height)
+                                    paneManager.updateSplitRatio(splitID: splitID, ratio: clamped)
+                                }
+                            )
+                            .onTapGesture(count: 2) {
+                                paneManager.updateSplitRatio(splitID: splitID, ratio: 0.5)
+                            }
 
                         PaneSplitView(node: second, paneManager: paneManager, tabManager: tabManager, theme: theme)
                     }
                 }
+            }
+        }
+    }
+}
+
+/// Draggable divider between split panes.
+/// Visible line is 1pt, but hit target is 7pt wide for easy grabbing.
+private struct SplitDivider: View {
+    let axis: Axis
+
+    var body: some View {
+        ZStack {
+            // Invisible hit target
+            Rectangle()
+                .fill(Color.clear)
+                .frame(
+                    width: axis == .horizontal ? 7 : nil,
+                    height: axis == .vertical ? 7 : nil
+                )
+                .contentShape(Rectangle())
+
+            // Visible divider line
+            Rectangle()
+                .fill(Color.gray.opacity(0.4))
+                .frame(
+                    width: axis == .horizontal ? 1 : nil,
+                    height: axis == .vertical ? 1 : nil
+                )
+        }
+        .frame(
+            width: axis == .horizontal ? 7 : nil,
+            height: axis == .vertical ? 7 : nil
+        )
+        .onHover { hovering in
+            if hovering {
+                if axis == .horizontal {
+                    NSCursor.resizeLeftRight.push()
+                } else {
+                    NSCursor.resizeUpDown.push()
+                }
+            } else {
+                NSCursor.pop()
             }
         }
     }

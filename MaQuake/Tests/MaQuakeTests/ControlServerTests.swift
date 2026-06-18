@@ -228,10 +228,10 @@ struct ControlServerHandlerTests {
     @Test func focus_bySessionID_selectsTab() {
         let (server, wc) = makeServer()
         wc.tabManager.addTab()
-        let firstTabID = wc.tabManager.tabs[0].id.uuidString
+        let firstPaneID = wc.tabManager.tabs[0].paneManager!.focusedPaneID
         wc.tabManager.selectTab(at: 1) // focus second tab
 
-        let result = server.handleRequest(json(["action": "focus", "session_id": firstTabID]))
+        let result = server.handleRequest(json(["action": "focus", "session_id": firstPaneID]))
         let parsed = parse(result)
         #expect(parsed?["ok"] as? Bool == true)
         #expect(wc.tabManager.activeTabIndex == 0)
@@ -248,7 +248,7 @@ struct ControlServerHandlerTests {
 
     @Test func focus_invalidSessionID_returnsError() {
         let (server, _) = makeServer()
-        let result = server.handleRequest(json(["action": "focus", "session_id": "00000000-0000-0000-0000-000000000000"]))
+        let result = server.handleRequest(json(["action": "focus", "session_id": "NONEXIST"]))
         let parsed = parse(result)
         #expect(parsed?["ok"] as? Bool == false)
     }
@@ -263,13 +263,13 @@ struct ControlServerHandlerTests {
 
     // MARK: - close-session
 
-    @Test func closeSession_bySessionID_closesTab() {
+    @Test func closeSession_byTabID_closesTab() {
         let (server, wc) = makeServer()
         wc.tabManager.addTab()
         #expect(wc.tabManager.tabs.count == 2)
-        let tabID = wc.tabManager.tabs[0].id.uuidString
+        let tabID = wc.tabManager.tabs[0].id
 
-        let result = server.handleRequest(json(["action": "close-session", "session_id": tabID]))
+        let result = server.handleRequest(json(["action": "close-session", "tab_id": tabID]))
         let parsed = parse(result)
         #expect(parsed?["ok"] as? Bool == true)
         // Tab closed but auto-created new one if needed
@@ -288,7 +288,7 @@ struct ControlServerHandlerTests {
 
     @Test func closeSession_invalidID_returnsError() {
         let (server, _) = makeServer()
-        let result = server.handleRequest(json(["action": "close-session", "session_id": "00000000-0000-0000-0000-000000000000"]))
+        let result = server.handleRequest(json(["action": "close-session", "session_id": "NONEXIST"]))
         let parsed = parse(result)
         #expect(parsed?["ok"] as? Bool == false)
     }
@@ -426,8 +426,8 @@ struct ControlServerHandlerTests {
 
     @Test func setAppearance_withTitle_renamesTab() {
         let (server, wc) = makeServer()
-        let tabID = wc.tabManager.tabs[0].id.uuidString
-        let result = server.handleRequest(json(["action": "set-appearance", "title": "MyTab", "session_id": tabID]))
+        let tabID = wc.tabManager.tabs[0].id
+        let result = server.handleRequest(json(["action": "set-appearance", "title": "MyTab", "tab_id": tabID]))
         let parsed = parse(result)
         #expect(parsed?["ok"] as? Bool == true)
         #expect(wc.tabManager.tabs[0].customTitle == "MyTab")
@@ -435,11 +435,11 @@ struct ControlServerHandlerTests {
 
     @Test func setAppearance_emptyTitle_clearsCustomName() {
         let (server, wc) = makeServer()
-        let tabID = wc.tabManager.tabs[0].id.uuidString
+        let tabID = wc.tabManager.tabs[0].id
         wc.tabManager.renameTab(id: wc.tabManager.tabs[0].id, name: "Custom")
         #expect(wc.tabManager.tabs[0].customTitle == "Custom")
 
-        let result = server.handleRequest(json(["action": "set-appearance", "title": "", "session_id": tabID]))
+        let result = server.handleRequest(json(["action": "set-appearance", "title": "", "tab_id": tabID]))
         let parsed = parse(result)
         #expect(parsed?["ok"] as? Bool == true)
         #expect(wc.tabManager.tabs[0].customTitle == nil)

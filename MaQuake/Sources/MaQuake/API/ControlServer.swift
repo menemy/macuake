@@ -198,41 +198,54 @@ final class ControlServer {
         case "control-char":  return handleControlChar(json, wc)
         case "clear":         return handleClear(json, wc)
         case "split":         return handleSplit(json, wc)
+        case "resize-split":  return handleResizeSplit(json, wc)
         case "set-appearance": return handleSetAppearance(json, wc)
         default:              return jsonError("unknown action: \(action)")
         }
     }
 
-    // MARK: - Handlers
+    // MARK: - Handlers (iTerm2-style: session = pane, tab = container)
 
     @MainActor
     private func handleList(_ wc: WindowController, includePanes: Bool = false) -> String {
+        var allSessions: [[String: Any]] = []
         let tabs = wc.tabManager.tabs.enumerated().map { (i, tab) -> [String: Any] in
             var info: [String: Any] = [
-                "session_id": tab.id.uuidString,
+                "tab_id": tab.id,
                 "index": i,
-                "title": tab.title,
+                "title": tab.displayTitle,
                 "active": i == wc.tabManager.activeTabIndex,
-                "cwd": tab.instance?.currentDirectory ?? ""
             ]
-            if includePanes, let pm = tab.paneManager {
-                info["panes"] = serializePaneTree(pm.rootPane)
-                info["focused_pane_id"] = pm.focusedPaneID.uuidString
-                info["pane_count"] = pm.rootPane.leafIDs.count
+            if let pm = tab.paneManager {
+                let sessions = pm.rootPane.leafIDs.map { sid -> [String: Any] in
+                    let inst = pm.instance(for: sid)
+                    return [
+                        "session_id": sid,
+                        "focused": sid == pm.focusedPaneID,
+                        "cwd": inst?.currentDirectory ?? ""
+                    ]
+                }
+                info["sessions"] = sessions
+                allSessions.append(contentsOf: sessions)
+                if includePanes {
+                    info["panes"] = serializePaneTree(pm.rootPane)
+                }
             }
             return info
         }
-        return jsonOK(["tabs": tabs, "count": tabs.count])
+        let activeSID = wc.tabManager.activeTab?.paneManager?.focusedPaneID ?? ""
+        return jsonOK(["tabs": tabs, "tab_count": tabs.count, "session_count": allSessions.count, "active_session_id": activeSID])
     }
 
     @MainActor
     private func handleState(_ wc: WindowController) -> String {
+        let activeSID = wc.tabManager.activeTab?.paneManager?.focusedPaneID ?? ""
         let data: [String: Any] = [
             "visible": wc.state == .visible,
             "pinned": wc.isPinned,
             "tab_count": wc.tabManager.tabs.count,
             "active_tab_index": wc.tabManager.activeTabIndex,
-            "active_session_id": wc.tabManager.activeTab?.id.uuidString ?? "",
+            "active_session_id": activeSID,
             "width_percent": wc.widthPercent,
             "height_percent": wc.heightPercent
         ]
@@ -247,68 +260,80 @@ final class ControlServer {
         if let name = json["name"] as? String, !name.isEmpty {
             wc.tabManager.renameTab(id: tab.id, name: name)
         }
-        return jsonOK(["session_id": tab.id.uuidString])
+        let sid = tab.paneManager?.focusedPaneID ?? ""
+        return jsonOK(["session_id": sid, "tab_id": tab.id])
     }
 
     @MainActor
     private func handleFocus(_ json: [String: Any], _ wc: WindowController) -> String {
-        // Focus a pane within a tab
-        if let paneID = json["pane-id"] as? String, let uuid = UUID(uuidString: paneID) {
-            let tab = resolveTab(json, wc) ?? wc.tabManager.activeTab
-            guard let tab, let pm = tab.paneManager else {
-                return jsonError("no active terminal tab")
+        // Focus a session (pane) — auto-switches to its tab
+        if let sid = json["session_id"] as? String {
+            guard let (_, tab, pm) = findSession(sid, wc) else {
+                return jsonError("session not found: \(sid)")
             }
-            guard pm.rootPane.leafIDs.contains(uuid) else {
-                return jsonError("pane not found: \(paneID)")
-            }
-            pm.focusedPaneID = uuid
-            return jsonOK(["session_id": tab.id.uuidString, "pane_id": uuid.uuidString])
+            pm.focusedPaneID = sid
+            let idx = wc.tabManager.tabs.firstIndex(where: { $0.id == tab.id })!
+            wc.tabManager.selectTab(at: idx)
+            wc.tabManager.focusTerminalInActiveTab()
+            return jsonOK(["session_id": sid])
         }
-        // Focus a tab
-        if let sessionID = json["session_id"] as? String {
-            guard let idx = wc.tabManager.tabs.firstIndex(where: { $0.id.uuidString == sessionID }) else {
-                return jsonError("session not found: \(sessionID)")
+        // Focus a tab by tab_id
+        if let tabID = json["tab_id"] as? String {
+            guard let idx = wc.tabManager.tabs.firstIndex(where: { $0.id == tabID }) else {
+                return jsonError("tab not found: \(tabID)")
             }
             wc.tabManager.selectTab(at: idx)
-            return jsonOK()
+            let sid = wc.tabManager.tabs[idx].paneManager?.focusedPaneID ?? ""
+            return jsonOK(["session_id": sid])
         }
+        // Focus by index
         if let index = json["index"] as? Int {
             wc.tabManager.selectTab(at: index)
-            return jsonOK()
+            let sid = wc.tabManager.activeTab?.paneManager?.focusedPaneID ?? ""
+            return jsonOK(["session_id": sid])
         }
         // Pane navigation by direction
         if let direction = json["direction"] as? String {
+            guard direction == "prev" || direction == "next" else {
+                return jsonError("direction must be \"prev\" or \"next\"")
+            }
             guard let tab = wc.tabManager.activeTab, let pm = tab.paneManager else {
                 return jsonError("no active terminal tab")
             }
             pm.moveFocus(direction == "prev" ? .previous : .next)
-            return jsonOK(["session_id": tab.id.uuidString, "pane_id": pm.focusedPaneID.uuidString])
+            wc.tabManager.focusTerminalInActiveTab()
+            return jsonOK(["session_id": pm.focusedPaneID])
         }
-        return jsonError("provide session_id, index, pane-id, or direction")
+        return jsonError("provide session_id, tab_id, index, or direction")
     }
 
     @MainActor
     private func handleClose(_ json: [String: Any], _ wc: WindowController) -> String {
-        // Close a specific pane
-        if let paneID = json["pane-id"] as? String, let uuid = UUID(uuidString: paneID) {
-            let tab = resolveTab(json, wc) ?? wc.tabManager.activeTab
-            guard let tab, let pm = tab.paneManager else {
-                return jsonError("no active terminal tab")
-            }
-            pm.closePane(id: uuid)
-            return jsonOK(["session_id": tab.id.uuidString, "pane_count": pm.rootPane.leafIDs.count])
-        }
-        // Close a tab
-        let sessionID = json["session_id"] as? String
-        if let sid = sessionID {
-            guard let tab = wc.tabManager.tabs.first(where: { $0.id.uuidString == sid }) else {
+        // Close a session (pane) — if last pane, closes the tab
+        if let sid = json["session_id"] as? String {
+            guard let (_, tab, pm) = findSession(sid, wc) else {
                 return jsonError("session not found: \(sid)")
             }
-            wc.tabManager.closeTab(id: tab.id)
-        } else {
-            if let tab = wc.tabManager.activeTab {
-                wc.tabManager.closeTab(id: tab.id)
+            let wasLastPane = pm.rootPane.leafCount == 1
+            pm.closePane(id: sid)
+            if wasLastPane {
+                // onLastPaneClosed fires closeTab; report 0 remaining
+                return jsonOK(["pane_count": 0])
             }
+            return jsonOK(["pane_count": pm.rootPane.leafIDs.count])
+        }
+        // Close a tab by tab_id
+        if let tabID = json["tab_id"] as? String {
+            guard wc.tabManager.tabs.contains(where: { $0.id == tabID }) else {
+                return jsonError("tab not found: \(tabID)")
+            }
+            wc.tabManager.closeTab(id: tabID)
+            return jsonOK()
+        }
+        // Close focused pane in active tab
+        if let tab = wc.tabManager.activeTab, let pm = tab.paneManager {
+            pm.closePane(id: pm.focusedPaneID)
+            return jsonOK(["pane_count": pm.rootPane.leafIDs.count])
         }
         return jsonOK()
     }
@@ -318,32 +343,28 @@ final class ControlServer {
         guard let command = json["command"] as? String else {
             return jsonError("missing command")
         }
-        let tab = resolveTab(json, wc)
-        guard let tab else { return jsonError("session not found") }
-        guard let instance = tab.instance else { return jsonError("not a terminal tab") }
+        guard let (instance, _, sessionID) = resolveSession(json, wc) else {
+            return jsonError("session not found")
+        }
 
-        // Send command as paste text, then press Enter as a key event.
-        // ghostty_surface_text triggers bracketed paste mode — the shell
-        // won't execute until Enter is pressed outside the paste brackets.
         instance.backend.send(text: command)
         if let gb = instance.backend as? GhosttyBackend {
-            // keyCode 36 = Return key, text "\r"
             gb.sendKeyPress(keyCode: 36, text: "\r")
         }
-        return jsonOK(["session_id": tab.id.uuidString])
+        return jsonOK(["session_id": sessionID])
     }
 
     @MainActor
     private func handleRead(_ json: [String: Any], _ wc: WindowController) -> String {
-        let tab = resolveTab(json, wc)
-        guard let tab else { return jsonError("session not found") }
-        guard let instance = tab.instance else { return jsonError("not a terminal tab") }
+        guard let (instance, _, sessionID) = resolveSession(json, wc) else {
+            return jsonError("session not found")
+        }
 
         let lineCount = min(max(json["lines"] as? Int ?? 20, 1), 10000)
         let snapshot = instance.backend.readBuffer(lineCount: lineCount)
 
         return jsonOK([
-            "session_id": tab.id.uuidString,
+            "session_id": sessionID,
             "lines": snapshot.lines,
             "rows": snapshot.rows,
             "cols": snapshot.cols
@@ -355,12 +376,12 @@ final class ControlServer {
         guard let text = json["text"] as? String else {
             return jsonError("missing text")
         }
-        let tab = resolveTab(json, wc)
-        guard let tab else { return jsonError("session not found") }
-        guard let instance = tab.instance else { return jsonError("not a terminal tab") }
+        guard let (instance, _, sessionID) = resolveSession(json, wc) else {
+            return jsonError("session not found")
+        }
 
         instance.backend.send(text: text)
-        return jsonOK(["session_id": tab.id.uuidString])
+        return jsonOK(["session_id": sessionID])
     }
 
     @MainActor
@@ -368,14 +389,13 @@ final class ControlServer {
         guard let key = json["key"] as? String else {
             return jsonError("missing key")
         }
-        let tab = resolveTab(json, wc)
-        guard let tab else { return jsonError("session not found") }
-        guard let instance = tab.instance else { return jsonError("not a terminal tab") }
+        guard let (instance, _, sessionID) = resolveSession(json, wc) else {
+            return jsonError("session not found")
+        }
 
         guard let gb = instance.backend as? GhosttyBackend else {
             return jsonError("backend does not support key events")
         }
-        // Send as key events, not paste — control chars must bypass bracketed paste
         switch key {
         case "c":     gb.sendKeyPress(keyCode: 8,  text: "\u{03}")
         case "d":     gb.sendKeyPress(keyCode: 2,  text: "\u{04}")
@@ -391,18 +411,18 @@ final class ControlServer {
         case "tab":   gb.sendKeyPress(keyCode: 48, text: "\t")
         default:      return jsonError("unknown key: \(key)")
         }
-        return jsonOK(["session_id": tab.id.uuidString])
+        return jsonOK(["session_id": sessionID])
     }
 
     @MainActor
     private func handleClear(_ json: [String: Any], _ wc: WindowController) -> String {
-        let tab = resolveTab(json, wc)
-        guard let tab else { return jsonError("session not found") }
-        guard let instance = tab.instance else { return jsonError("not a terminal tab") }
+        guard let (instance, _, sessionID) = resolveSession(json, wc) else {
+            return jsonError("session not found")
+        }
         if let gb = instance.backend as? GhosttyBackend {
             gb.sendKeyPress(keyCode: 37, text: "\u{0C}")
         }
-        return jsonOK(["session_id": tab.id.uuidString])
+        return jsonOK(["session_id": sessionID])
     }
 
     @MainActor
@@ -411,20 +431,71 @@ final class ControlServer {
               direction == "h" || direction == "v" else {
             return jsonError("provide direction: \"h\" or \"v\"")
         }
-        guard let tab = resolveTab(json, wc) ?? wc.tabManager.activeTab,
-              let pm = tab.paneManager else {
+
+        let axis: Axis = direction == "h" ? .horizontal : .vertical
+        let ratio = CGFloat(json["ratio"] as? Double ?? 0.5)
+
+        // Split a specific session, or the focused pane in active tab
+        if let sid = json["session_id"] as? String {
+            guard let (_, _, pm) = findSession(sid, wc) else {
+                return jsonError("session not found: \(sid)")
+            }
+            guard pm.splitPane(id: sid, axis: axis, ratio: ratio) else {
+                return jsonError("split failed")
+            }
+            return jsonOK(["session_id": pm.focusedPaneID])
+        }
+
+        guard let tab = wc.tabManager.activeTab, let pm = tab.paneManager else {
             return jsonError("no active terminal tab")
         }
-        let axis: Axis = direction == "h" ? .horizontal : .vertical
-        pm.splitFocusedPane(axis: axis)
-        return jsonOK(["session_id": tab.id.uuidString])
+        guard pm.splitFocusedPane(axis: axis, ratio: ratio) else {
+            return jsonError("split failed")
+        }
+        return jsonOK(["session_id": pm.focusedPaneID])
+    }
+
+    @MainActor
+    private func handleResizeSplit(_ json: [String: Any], _ wc: WindowController) -> String {
+        guard let tab = wc.tabManager.activeTab, let pm = tab.paneManager else {
+            return jsonError("no active terminal tab")
+        }
+
+        // Option 1: Set absolute ratio
+        if let ratio = json["ratio"] as? Double {
+            let targetPaneID = json["session_id"] as? String ?? pm.focusedPaneID
+            guard let splitID = parentSplitID(of: targetPaneID, in: pm.rootPane) else {
+                return jsonError("pane is not in a split")
+            }
+            pm.updateSplitRatio(splitID: splitID, ratio: CGFloat(ratio))
+            return jsonOK()
+        }
+
+        // Option 2: Equalize all splits
+        if let equalize = json["equalize"] as? Bool, equalize {
+            pm.equalizeSplits()
+            return jsonOK()
+        }
+
+        // Option 3: Resize by delta (percentage points, e.g. 10 = +10%)
+        if let delta = json["delta"] as? Double {
+            let targetPaneID = json["session_id"] as? String ?? pm.focusedPaneID
+            // Temporarily set focus to target pane for directional resize
+            let originalFocus = pm.focusedPaneID
+            pm.focusedPaneID = targetPaneID
+            pm.resizeFocusedSplit(delta: CGFloat(delta) / 100.0)
+            pm.focusedPaneID = originalFocus
+            return jsonOK()
+        }
+
+        return jsonError("provide ratio (0.1-0.9), delta (-90 to 90), or equalize: true")
     }
 
     @MainActor
     private func serializePaneTree(_ node: PaneNode) -> [String: Any] {
         switch node {
         case .leaf(let id, _):
-            return ["type": "leaf", "pane_id": id.uuidString]
+            return ["type": "leaf", "session_id": id]
         case .split(_, let axis, let first, let second, let ratio):
             return [
                 "type": "split",
@@ -438,24 +509,58 @@ final class ControlServer {
 
     @MainActor
     private func handleSetAppearance(_ json: [String: Any], _ wc: WindowController) -> String {
-        if let title = json["title"] as? String {
-            if let tab = resolveTab(json, wc) {
-                wc.tabManager.renameTab(id: tab.id, name: title.isEmpty ? nil : title)
-                return jsonOK(["session_id": tab.id.uuidString])
-            }
-            return jsonError("session not found")
+        guard let title = json["title"] as? String else {
+            return jsonError("provide title")
         }
-        return jsonError("provide title")
+        // Find tab by tab_id, or by session_id (find containing tab), or active tab
+        if let tabID = json["tab_id"] as? String {
+            guard wc.tabManager.tabs.contains(where: { $0.id == tabID }) else {
+                return jsonError("tab not found: \(tabID)")
+            }
+            wc.tabManager.renameTab(id: tabID, name: title.isEmpty ? nil : title)
+            return jsonOK(["tab_id": tabID])
+        }
+        if let sid = json["session_id"] as? String {
+            guard let (_, tab, _) = findSession(sid, wc) else {
+                return jsonError("session not found: \(sid)")
+            }
+            wc.tabManager.renameTab(id: tab.id, name: title.isEmpty ? nil : title)
+            return jsonOK(["tab_id": tab.id])
+        }
+        guard let tab = wc.tabManager.activeTab else {
+            return jsonError("no active tab")
+        }
+        wc.tabManager.renameTab(id: tab.id, name: title.isEmpty ? nil : title)
+        return jsonOK(["tab_id": tab.id])
     }
 
     // MARK: - Helpers
 
+    /// Find a session (pane) by its short ID, searching across all tabs.
     @MainActor
-    private func resolveTab(_ json: [String: Any], _ wc: WindowController) -> Tab? {
-        if let sid = json["session_id"] as? String {
-            return wc.tabManager.tabs.first(where: { $0.id.uuidString == sid })
+    private func findSession(_ sessionID: String, _ wc: WindowController) -> (TerminalInstance, Tab, PaneManager)? {
+        for tab in wc.tabManager.tabs {
+            guard let pm = tab.paneManager else { continue }
+            if pm.rootPane.leafIDs.contains(sessionID) {
+                guard let instance = pm.instance(for: sessionID) else { continue }
+                return (instance, tab, pm)
+            }
         }
-        return wc.tabManager.activeTab
+        return nil
+    }
+
+    /// Resolve a session from JSON params, defaulting to focused pane in active tab.
+    @MainActor
+    private func resolveSession(_ json: [String: Any], _ wc: WindowController) -> (TerminalInstance, Tab, String)? {
+        if let sid = json["session_id"] as? String {
+            guard let (inst, tab, _) = findSession(sid, wc) else { return nil }
+            return (inst, tab, sid)
+        }
+        // Default: focused pane in active tab
+        guard let tab = wc.tabManager.activeTab, let pm = tab.paneManager else { return nil }
+        let focusedID = pm.focusedPaneID
+        guard let inst = pm.instance(for: focusedID) else { return nil }
+        return (inst, tab, focusedID)
     }
 }
 

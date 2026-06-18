@@ -85,6 +85,18 @@ final class GhosttyBackend: NSObject, TerminalBackend {
         return newBackend
     }
 
+    func createSplitBackend() -> TerminalBackend? {
+        if let split = createSplitSurface() {
+            return split
+        }
+        #if DEBUG
+        // Test environment: no GPU surface, return plain backend for tree management tests
+        return GhosttyBackend()
+        #else
+        return nil
+        #endif
+    }
+
     // MARK: - Process lifecycle
 
     func startProcess(executable: String, execName: String, currentDirectory: String?) {

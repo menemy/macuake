@@ -31,7 +31,7 @@ struct TabTests {
     @Test func tab_identifiable_conformance() {
         let tab = Tab()
         // Tab conforms to Identifiable through its `id` property
-        let id: UUID = tab.id
+        let id: String = tab.id
         #expect(id == tab.id)
     }
 }

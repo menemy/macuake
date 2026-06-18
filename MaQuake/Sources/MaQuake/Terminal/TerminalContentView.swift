@@ -85,6 +85,8 @@ final class TerminalInstance: NSObject, TerminalBackendDelegate {
     var onTitleChange: ((String) -> Void)?
     var onDirectoryChange: ((String) -> Void)?
     var onProcessTerminated: (() -> Void)?
+    var onResizeSplit: ((CGFloat) -> Void)?
+    var onEqualizeSplits: (() -> Void)?
     private(set) var currentTitle: String = "zsh"
     private(set) var currentDirectory: String = ""
     private var isTerminated = false
@@ -143,5 +145,16 @@ final class TerminalInstance: NSObject, TerminalBackendDelegate {
     func terminalProcessTerminated(exitCode: Int32?) {
         isTerminated = true
         onProcessTerminated?()
+    }
+
+    func terminalRequestedResizeSplit(direction: UInt32, amount: UInt16) {
+        // Ghostty sends amount as percentage points (e.g. 10 = 10%).
+        // Convert to ratio delta: positive = grow focused pane.
+        let delta = CGFloat(amount) / 100.0
+        onResizeSplit?(delta)
+    }
+
+    func terminalRequestedEqualizeSplits() {
+        onEqualizeSplits?()
     }
 }

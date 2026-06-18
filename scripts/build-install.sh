@@ -13,8 +13,14 @@ SIGNING_IDENTITY="Developer ID Application: Denti.AI Technology Inc (45N4N4R4C3)
 
 cd "$PROJECT_ROOT"
 
-echo "==> Building universal release (arm64 + x86_64)..."
-swift build --build-system xcode -c release --arch arm64 --arch x86_64
+ARCH="${1:---arch arm64}"
+if [ "$ARCH" = "--universal" ]; then
+    echo "==> Building universal release (arm64 + x86_64)..."
+    swift build --build-system xcode -c release --arch arm64 --arch x86_64
+else
+    echo "==> Building release (arm64)..."
+    swift build --build-system xcode -c release --arch arm64
+fi
 
 echo "==> Copying binary..."
 cp .build/apple/Products/Release/Macuake "$BINARY"
@@ -38,6 +44,12 @@ for bundle in .build/apple/Products/Release/*.bundle; do
     echo "    $name"
 done
 
+echo "==> Removing stale bundles from app root..."
+for bundle in "$APP_BUNDLE"/*.bundle; do
+    [ -d "$bundle" ] || continue
+    rm -rf "$bundle"
+done
+
 echo "==> Embedding Sparkle.framework..."
 FRAMEWORKS_DIR="$APP_BUNDLE/Contents/Frameworks"
 mkdir -p "$FRAMEWORKS_DIR"
@@ -52,41 +64,54 @@ fi
 echo "==> Fixing rpath for embedded frameworks..."
 install_name_tool -add_rpath "@executable_path/../Frameworks" "$BINARY" 2>/dev/null || true
 
-echo "==> Signing (inside-out) with: $SIGNING_IDENTITY"
+# Check if signing identity is available; fall back to ad-hoc for dev builds
+if security find-identity -v -p codesigning | grep -q "$SIGNING_IDENTITY"; then
+    SIGN_ID="$SIGNING_IDENTITY"
+    SIGN_OPTS="--options runtime"
+    echo "==> Signing (inside-out) with: $SIGN_ID"
+else
+    SIGN_ID="-"
+    SIGN_OPTS=""
+    echo "==> Signing (ad-hoc, Developer ID not found)"
+fi
 
 # Sign resource bundles in Resources/
 for bundle in "$APP_BUNDLE"/Contents/Resources/*.bundle; do
     [ -d "$bundle" ] || continue
-    codesign --force --sign "$SIGNING_IDENTITY" "$bundle"
+    codesign --force --sign "$SIGN_ID" "$bundle"
 done
 
 # Sign Sparkle components inside-out
-codesign --force --sign "$SIGNING_IDENTITY" --options runtime \
+codesign --force --sign "$SIGN_ID" $SIGN_OPTS \
     "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc"
-codesign --force --sign "$SIGNING_IDENTITY" --options runtime \
+codesign --force --sign "$SIGN_ID" $SIGN_OPTS \
     "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc"
-codesign --force --sign "$SIGNING_IDENTITY" --options runtime \
+codesign --force --sign "$SIGN_ID" $SIGN_OPTS \
     "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/Autoupdate"
-codesign --force --sign "$SIGNING_IDENTITY" --options runtime \
+codesign --force --sign "$SIGN_ID" $SIGN_OPTS \
     "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app"
-codesign --force --sign "$SIGNING_IDENTITY" --options runtime \
+codesign --force --sign "$SIGN_ID" $SIGN_OPTS \
     "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
 
 # Sign main app bundle last
-codesign --force --sign "$SIGNING_IDENTITY" \
-    --options runtime \
+codesign --force --sign "$SIGN_ID" \
+    $SIGN_OPTS \
     --entitlements "$ENTITLEMENTS" \
     "$APP_BUNDLE"
 
 codesign --verify --deep --strict "$APP_BUNDLE"
 echo "==> Signed and verified: $APP_BUNDLE"
 
-# Always install: kill running instance, force-replace, relaunch
-echo "==> Installing to /Applications..."
-killall Macuake 2>/dev/null || true
+# Install as Macuake_dev.app to avoid conflicting with brew-installed Macuake.app
+INSTALL_NAME="Macuake_dev"
+echo "==> Installing to /Applications/${INSTALL_NAME}.app..."
+killall "$INSTALL_NAME" 2>/dev/null || true
 sleep 0.3
-rm -rf /Applications/Macuake.app
-cp -R "$APP_BUNDLE" /Applications/Macuake.app
-echo "==> Installed: /Applications/Macuake.app"
+rm -rf "/Applications/${INSTALL_NAME}.app"
+cp -R "$APP_BUNDLE" "/Applications/${INSTALL_NAME}.app"
+mv "/Applications/${INSTALL_NAME}.app/Contents/MacOS/Macuake" "/Applications/${INSTALL_NAME}.app/Contents/MacOS/${INSTALL_NAME}"
+/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable ${INSTALL_NAME}" "/Applications/${INSTALL_NAME}.app/Contents/Info.plist" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string ${INSTALL_NAME}" "/Applications/${INSTALL_NAME}.app/Contents/Info.plist"
+echo "==> Installed: /Applications/${INSTALL_NAME}.app"
 
 echo "Done."

@@ -31,8 +31,15 @@ protocol TerminalBackend: AnyObject {
     func send(text: String)
     func readBuffer(lineCount: Int) -> TerminalBufferSnapshot
 
+    // Split
+    func createSplitBackend() -> TerminalBackend?
+
     // Delegate
     var delegate: TerminalBackendDelegate? { get set }
+}
+
+extension TerminalBackend {
+    func createSplitBackend() -> TerminalBackend? { nil }
 }
 
 protocol TerminalBackendDelegate: AnyObject {
