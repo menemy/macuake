@@ -335,6 +335,10 @@ final class DoubleClickNSView: NSView {
                         if v is MouseDownNSView || v is NSButton || v is NSTextField {
                             return event
                         }
+                        let className = String(describing: type(of: v))
+                        if className.contains("Button") {
+                            return event
+                        }
                         if v.gestureRecognizers.contains(where: { $0 is NSClickGestureRecognizer }) {
                             return event
                         }
