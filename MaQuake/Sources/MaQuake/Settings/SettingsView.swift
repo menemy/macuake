@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage("mcpAccess") private var mcpAccess: String = "ask"
     @AppStorage("confirmOnQuit") private var confirmOnQuit: Bool = false
     @AppStorage("restoreTabsOnLaunch") private var restoreTabsOnLaunch: Bool = true
+    @AppStorage("disableAnimation") private var disableAnimation: Bool = false
     @AppStorage("shellPath") private var shellPath: String = ""
     @State private var customShellPath: String = ""
     @State private var isCustomShell: Bool = false
@@ -68,6 +69,10 @@ struct SettingsView: View {
                         }
                         HStack {
                             Toggle("Restore tabs on launch", isOn: $restoreTabsOnLaunch)
+                            Spacer()
+                        }
+                        HStack {
+                            Toggle("Disable animation", isOn: $disableAnimation)
                             Spacer()
                         }
                     }
@@ -246,7 +251,7 @@ struct SettingsView: View {
                                     get: { Double(windowController.heightPercent) },
                                     set: { windowController.setHeightPercent(Int($0)) }
                                 ),
-                                in: 20...90,
+                                in: 20...100,
                                 step: 5
                             )
                             Text("\(windowController.heightPercent)%")

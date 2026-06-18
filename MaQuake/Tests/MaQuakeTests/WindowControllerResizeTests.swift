@@ -48,10 +48,10 @@ struct WindowControllerPercentClampingTests {
         #expect(wc.heightPercent == 20)
     }
 
-    @Test func setHeightPercent_aboveMax_clampedTo90() {
+    @Test func setHeightPercent_aboveMax_clampedTo100() {
         let wc = WindowController()
-        wc.setHeightPercent(95)
-        #expect(wc.heightPercent == 90)
+        wc.setHeightPercent(110)
+        #expect(wc.heightPercent == 100)
     }
 
     @Test func setHeightPercent_atMin_exact20() {
@@ -60,10 +60,10 @@ struct WindowControllerPercentClampingTests {
         #expect(wc.heightPercent == 20)
     }
 
-    @Test func setHeightPercent_atMax_exact90() {
+    @Test func setHeightPercent_atMax_exact100() {
         let wc = WindowController()
-        wc.setHeightPercent(90)
-        #expect(wc.heightPercent == 90)
+        wc.setHeightPercent(100)
+        #expect(wc.heightPercent == 100)
     }
 
     @Test func setHeightPercent_normalValue_setsExactly() {
@@ -92,10 +92,10 @@ struct WindowControllerPercentClampingTests {
         #expect(wc.heightPercent == 20)
     }
 
-    @Test func setHeightPercent_91_clampedTo90() {
+    @Test func setHeightPercent_101_clampedTo100() {
         let wc = WindowController()
-        wc.setHeightPercent(91)
-        #expect(wc.heightPercent == 90)
+        wc.setHeightPercent(101)
+        #expect(wc.heightPercent == 100)
     }
 }
 
@@ -132,11 +132,55 @@ struct WindowControllerDeltaResizeTests {
         #expect(wc.heightPercent >= 20)
     }
 
-    @Test func updateHeightByDelta_fullHeight_clampedTo90() {
+    @Test func updateHeightByDelta_fullHeight_clampedTo100() {
         let wc = WindowController()
         let screenHeight = wc.resolvedScreen.frame.height
         wc.updateHeightByDelta(screenHeight * 2)
-        #expect(wc.heightPercent == 90)
+        #expect(wc.heightPercent == 100)
+    }
+}
+
+@MainActor
+@Suite(.serialized)
+struct WindowControllerAnimationTests {
+
+    @Test func show_withAnimationDisabled_changesStateInstantly() {
+        UserDefaults.standard.set(true, forKey: "disableAnimation")
+        defer { UserDefaults.standard.removeObject(forKey: "disableAnimation") }
+
+        let wc = WindowController()
+        #expect(wc.state == .hidden)
+        wc.show()
+        #expect(wc.state == .visible)
+    }
+
+    @Test func hide_withAnimationDisabled_changesStateInstantly() {
+        UserDefaults.standard.set(true, forKey: "disableAnimation")
+        defer { UserDefaults.standard.removeObject(forKey: "disableAnimation") }
+
+        let wc = WindowController()
+        wc.show()
+        #expect(wc.state == .visible)
+        wc.hide()
+        #expect(wc.state == .hidden)
+    }
+
+    @Test func toggle_withAnimationDisabled_worksCorrectly() {
+        UserDefaults.standard.set(true, forKey: "disableAnimation")
+        defer { UserDefaults.standard.removeObject(forKey: "disableAnimation") }
+
+        let wc = WindowController()
+        wc.toggle()
+        #expect(wc.state == .visible)
+        wc.toggle()
+        #expect(wc.state == .hidden)
+    }
+
+    @Test func heightPercent_allowsFullScreen() {
+        let wc = WindowController()
+        wc.setHeightPercent(100)
+        #expect(wc.heightPercent == 100)
+        #expect(wc.terminalSize.height > 0)
     }
 }
 
