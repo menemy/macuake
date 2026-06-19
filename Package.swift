@@ -24,7 +24,7 @@ let package = Package(
                 .product(name: "Sparkle", package: "Sparkle"),
                 .product(name: "MCP", package: "swift-sdk"),
             ],
-            path: "MaQuake/Sources/MaQuake",
+            path: "Macuake/Sources/Macuake",
             resources: [
                 .process("../../Resources"),
             ],
@@ -38,7 +38,7 @@ let package = Package(
         .testTarget(
             name: "MacuakeTests",
             dependencies: ["Macuake"],
-            path: "MaQuake/Tests/MaQuakeTests"
+            path: "Macuake/Tests/MacuakeTests"
         ),
     ]
 )

@@ -107,7 +107,7 @@ echo '{"action":"split","direction":"h"}' | nc -U /tmp/macuake.sock
 ## Architecture
 
 ```
-MaQuake/Sources/MaQuake/
+Macuake/Sources/Macuake/
 ├── API/              # ControlServer (socket API)
 ├── MCP/              # MCPHTTPServer (MCP over HTTP)
 ├── Panes/            # PaneManager, PaneNode tree
