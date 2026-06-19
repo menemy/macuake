@@ -34,59 +34,54 @@ struct PaneSplitView: View {
     var body: some View {
         switch node {
         case .leaf(let id, let backend):
-            ZStack {
-                TerminalContentView(backend: backend, theme: theme)
-
-                // Focus indicator when multiple panes exist
-                if paneManager.focusedPaneID == id && paneManager.rootPane.leafCount > 1 {
-                    RoundedRectangle(cornerRadius: 2)
-                        .stroke(Color.accentColor.opacity(0.6), lineWidth: 2)
-                        .padding(1)
-                }
-            }
-            .contentShape(Rectangle())
-            .simultaneousGesture(TapGesture().onEnded {
-                paneManager.focusedPaneID = id
-                tabManager.focusTerminalInActiveTab()
-            })
-            .contextMenu {
-                Button("Split Right") {
-                    paneManager.splitPane(id: id, axis: .horizontal)
-                }
-                Button("Split Down") {
-                    paneManager.splitPane(id: id, axis: .vertical)
-                }
-
-                Divider()
-
-                if paneManager.rootPane.leafCount > 1 {
-                    Button("Close Pane") {
-                        paneManager.closePane(id: id)
+            if backend is PreviewBackend {
+                // Preview panes own their interactions (scroll, etc.) — don't attach
+                // the terminal tap-gesture / context menu / hit-shape, which would
+                // steal right-click and drag from the hosted preview. Just a close ✕.
+                leafContent(id: id, backend: backend)
+                    .overlay(alignment: .topTrailing) {
+                        Button {
+                            paneManager.closePane(id: id)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 15))
+                                .symbolRenderingMode(.palette)
+                                .foregroundStyle(Color.white, Color.black.opacity(0.55))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(6)
+                        .help("Close preview")
                     }
+            } else {
+                leafContent(id: id, backend: backend)
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(TapGesture().onEnded {
+                        paneManager.focusedPaneID = id
+                        tabManager.focusTerminalInActiveTab()
+                    })
+                    .contextMenu {
+                        Button("Split Right") {
+                            paneManager.splitPane(id: id, axis: .horizontal)
+                        }
+                        Button("Split Down") {
+                            paneManager.splitPane(id: id, axis: .vertical)
+                        }
 
-                    Divider()
-                }
+                        Divider()
 
-                Button("New Tab Here") {
-                    let dir = paneManager.focusedInstance?.currentDirectory
-                    tabManager.addTab(in: dir)
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                // Preview panes are non-interactive — give them a visible close button.
-                if backend is PreviewBackend {
-                    Button {
-                        paneManager.closePane(id: id)
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 15))
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(Color.white, Color.black.opacity(0.55))
+                        if paneManager.rootPane.leafCount > 1 {
+                            Button("Close Pane") {
+                                paneManager.closePane(id: id)
+                            }
+
+                            Divider()
+                        }
+
+                        Button("New Tab Here") {
+                            let dir = paneManager.focusedInstance?.currentDirectory
+                            tabManager.addTab(in: dir)
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .padding(6)
-                    .help("Close preview")
-                }
             }
 
         case .split(let splitID, let axis, let first, let second, let ratio):
@@ -136,6 +131,21 @@ struct PaneSplitView: View {
                 }
             }
             .coordinateSpace(name: "split-\(splitID)")
+        }
+    }
+
+    /// The terminal/preview view plus the focus indicator, shared by both leaf branches.
+    @ViewBuilder
+    private func leafContent(id: String, backend: TerminalBackend) -> some View {
+        ZStack {
+            TerminalContentView(backend: backend, theme: theme)
+
+            // Focus indicator when multiple panes exist
+            if paneManager.focusedPaneID == id && paneManager.rootPane.leafCount > 1 {
+                RoundedRectangle(cornerRadius: 2)
+                    .stroke(Color.accentColor.opacity(0.6), lineWidth: 2)
+                    .padding(1)
+            }
         }
     }
 }
