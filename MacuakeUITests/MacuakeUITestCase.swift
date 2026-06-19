@@ -15,7 +15,7 @@ class MacuakeUITestCase: XCTestCase {
     }
 
     func macuakeApp() -> XCUIApplication {
-        let app = XCUIApplication(bundleIdentifier: "com.macuake.terminal")
+        let app = XCUIApplication(bundleIdentifier: "com.maquake.app")
         app.launchArguments.append(contentsOf: ["-ApplePersistenceIgnoreState", "YES"])
         return app
     }

@@ -2,7 +2,7 @@ import AppKit
 import GhosttyKit
 import os.log
 
-private let log = OSLog(subsystem: "com.macuake", category: "GhosttyApp")
+private let log = OSLog(subsystem: "com.maquake.app", category: "GhosttyApp")
 
 /// Singleton managing the ghostty_app_t lifecycle. One per process, shared across all surfaces/tabs.
 /// All methods must be called on the main thread.

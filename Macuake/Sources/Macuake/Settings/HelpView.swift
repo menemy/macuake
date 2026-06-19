@@ -142,7 +142,7 @@ struct HelpView: View {
                         )
                         troubleshootRow(
                             "Reset all preferences",
-                            "Run: defaults delete com.macuake.terminal"
+                            "Run: defaults delete com.maquake.app"
                         )
                     }
                     .padding(.leading, 4)

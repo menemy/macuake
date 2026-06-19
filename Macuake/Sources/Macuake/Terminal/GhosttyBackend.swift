@@ -2,7 +2,7 @@ import AppKit
 import GhosttyKit
 import os.log
 
-private let log = OSLog(subsystem: "com.macuake", category: "GhosttyBackend")
+private let log = OSLog(subsystem: "com.maquake.app", category: "GhosttyBackend")
 
 final class GhosttyBackend: NSObject, TerminalBackend {
     private(set) var surface: ghostty_surface_t?
