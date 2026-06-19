@@ -31,6 +31,9 @@ final class WindowController: ObservableObject {
     // Debounce: ignore resign/appSwitch hide triggers briefly after show()
     private var showTimestamp: Date = .distantPast
 
+    // Suppress auto-hide while switching Dock activation policy (which deactivates the app)
+    private var isChangingActivationPolicy = false
+
     // Scroll wheel state for tab switching
     private var scrollAccumulator: CGFloat = 0
     private var lastScrollTime: Date = .distantPast
@@ -128,6 +131,24 @@ final class WindowController: ObservableObject {
         panelWidth = screen.width
     }
 
+    /// Apply the "Show icon in Dock" setting. Switching activation policy
+    /// deactivates the app, which would otherwise trip the auto-hide observers and
+    /// collapse the panel — suppress that, and keep the panel up if it was visible.
+    func applyDockIconPolicy() {
+        let show = UserDefaults.standard.bool(forKey: DockIconPolicy.key)
+        let wasVisible = (state == .visible)
+        isChangingActivationPolicy = true
+        NSApp.setActivationPolicy(show ? .regular : .accessory)
+        if wasVisible {
+            showTimestamp = Date()
+            panel.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            self?.isChangingActivationPolicy = false
+        }
+    }
+
     // MARK: - Observers
 
     private func setupObservers() {
@@ -138,6 +159,7 @@ final class WindowController: ObservableObject {
         ) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
+                guard !self.isChangingActivationPolicy else { return }
                 guard Date().timeIntervalSince(self.showTimestamp) > 0.3 else { return }
                 if self.state == .visible && !self.isPinned {
                     self.hide()
@@ -153,6 +175,7 @@ final class WindowController: ObservableObject {
             guard let self else { return }
             guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
             Task { @MainActor in
+                guard !self.isChangingActivationPolicy else { return }
                 guard Date().timeIntervalSince(self.showTimestamp) > 0.3 else { return }
                 if app.bundleIdentifier != Bundle.main.bundleIdentifier,
                    self.state == .visible {

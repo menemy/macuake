@@ -81,7 +81,7 @@ struct SettingsView: View {
                         HStack {
                             Toggle("Show icon in Dock", isOn: $showDockIcon)
                                 .onChange(of: showDockIcon) {
-                                    DockIconPolicy.apply()
+                                    windowController.applyDockIconPolicy()
                                 }
                             Spacer()
                         }
