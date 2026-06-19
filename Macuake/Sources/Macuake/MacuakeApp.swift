@@ -162,9 +162,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SparkleUpdater.shared.checkForUpdates()
     }
 
-    /// Clicking the Dock icon (when shown) reveals the terminal.
+    /// Clicking the Dock icon (when shown) toggles the terminal.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        windowController.show()
+        windowController.toggle()
         return true
     }
 
