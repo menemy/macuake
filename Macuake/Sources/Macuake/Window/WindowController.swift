@@ -411,8 +411,9 @@ final class WindowController: ObservableObject {
             let tabBarTop = screen.frame.maxY - menuBarHeight
             let tabBarBottom = tabBarTop - 36
 
-            guard mouse.y >= tabBarBottom && mouse.y <= tabBarTop
-                    && mouse.x >= termX && mouse.x <= termX + termWidth else {
+            let inTabBar = mouse.y >= tabBarBottom && mouse.y <= tabBarTop
+                    && mouse.x >= termX && mouse.x <= termX + termWidth
+            guard inTabBar else {
                 return event
             }
 
