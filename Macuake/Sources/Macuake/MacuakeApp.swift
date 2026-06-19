@@ -162,8 +162,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SparkleUpdater.shared.checkForUpdates()
     }
 
-    /// Clicking the Dock icon (when shown) toggles the terminal.
+    /// Clicking the Dock icon toggles the terminal. A click on a visible panel is
+    /// first seen by the defocus observers (which hide it); if this reopen is the
+    /// tail of that same hide, don't re-open — otherwise toggle.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if windowController.consumeDefocusHide() { return true }
         windowController.toggle()
         return true
     }
