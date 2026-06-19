@@ -423,6 +423,17 @@ final class MCPHTTPServer {
                     "session_id": .object(["type": .string("string"), "description": .string("Target session (default: focused)")])
                 ])
              ])),
+        Tool(name: "preview_file", description: "Preview a local file (image, PDF, video, source code, Office doc, etc.) in a split pane beside the terminal via QuickLook. Path must be a local file the agent has written or can read.",
+             inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "path": .object(["type": .string("string"), "description": .string("Local file path to preview")]),
+                    "direction": .object(["type": .string("string"), "description": .string("Split direction: h (side-by-side, default) or v (top/bottom)")]),
+                    "session_id": .object(["type": .string("string"), "description": .string("Terminal session to split (default: focused)")]),
+                    "ratio": .object(["type": .string("number"), "description": .string("Split ratio 0.1-0.9 for the terminal pane (default: 0.5)")])
+                ]),
+                "required": .array([.string("path")])
+             ])),
         Tool(name: "set_appearance", description: "Set tab title (by tab_id, session_id, or active tab)",
              inputSchema: .object([
                 "type": .string("object"),
@@ -480,7 +491,8 @@ final class MCPHTTPServer {
             "new_tab": "new-tab", "focus": "focus", "close_session": "close-session",
             "execute": "execute", "read": "read", "paste": "paste",
             "control_char": "control-char", "clear": "clear", "split": "split",
-            "resize_split": "resize-split", "set_appearance": "set-appearance",
+            "resize_split": "resize-split", "preview_file": "preview-file",
+            "set_appearance": "set-appearance",
         ]
 
         guard let action = actionMap[params.name] else {

@@ -199,6 +199,7 @@ final class ControlServer {
         case "clear":         return handleClear(json, wc)
         case "split":         return handleSplit(json, wc)
         case "resize-split":  return handleResizeSplit(json, wc)
+        case "preview-file":  return handlePreviewFile(json, wc)
         case "set-appearance": return handleSetAppearance(json, wc)
         default:              return jsonError("unknown action: \(action)")
         }
@@ -453,6 +454,45 @@ final class ControlServer {
             return jsonError("split failed")
         }
         return jsonOK(["session_id": pm.focusedPaneID])
+    }
+
+    @MainActor
+    private func handlePreviewFile(_ json: [String: Any], _ wc: WindowController) -> String {
+        guard let path = json["path"] as? String, !path.isEmpty else {
+            return jsonError("missing path")
+        }
+        let expanded = (path as NSString).expandingTildeInPath
+        guard FileManager.default.fileExists(atPath: expanded) else {
+            return jsonError("file not found: \(expanded)")
+        }
+        let direction = json["direction"] as? String ?? "h"
+        guard direction == "h" || direction == "v" else {
+            return jsonError("direction must be \"h\" or \"v\"")
+        }
+        let axis: Axis = direction == "h" ? .horizontal : .vertical
+        let ratio = CGFloat(json["ratio"] as? Double ?? 0.5)
+
+        // Target a specific session, else the focused pane in the active tab.
+        let pm: PaneManager
+        let targetID: String
+        if let sid = json["session_id"] as? String {
+            guard let (_, _, foundPM) = findSession(sid, wc) else {
+                return jsonError("session not found: \(sid)")
+            }
+            pm = foundPM
+            targetID = sid
+        } else {
+            guard let tab = wc.tabManager.activeTab, let activePM = tab.paneManager else {
+                return jsonError("no active terminal tab")
+            }
+            pm = activePM
+            targetID = activePM.focusedPaneID
+        }
+
+        guard pm.addPreviewSplit(targetID: targetID, path: expanded, axis: axis, ratio: ratio) else {
+            return jsonError("preview failed")
+        }
+        return jsonOK(["preview_path": expanded])
     }
 
     @MainActor
