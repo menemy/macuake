@@ -48,6 +48,7 @@ final class PreviewBackend: TerminalBackend {
     // MARK: - TerminalBackend (no-ops — this is not a terminal)
 
     var view: NSView { container }
+    var focusableView: NSView { previewView }
 
     func startProcess(executable: String, execName: String, currentDirectory: String?) {}
     func terminate() { previewView.close() }

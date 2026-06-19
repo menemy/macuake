@@ -98,12 +98,13 @@ struct PaneSplitView: View {
                             .frame(width: firstWidth)
 
                         SplitDivider(axis: .horizontal)
-                            .gesture(DragGesture()
+                            .gesture(DragGesture(coordinateSpace: .named("split-\(splitID)"))
                                 .onChanged { value in
                                     let newRatio = value.location.x / geo.size.width
                                     let clamped = min(max(newRatio, minPaneSize / geo.size.width), 1 - minPaneSize / geo.size.width)
                                     paneManager.updateSplitRatio(splitID: splitID, ratio: clamped)
                                 }
+                                .onEnded { _ in NSCursor.arrow.set() }
                             )
                             .onTapGesture(count: 2) {
                                 paneManager.updateSplitRatio(splitID: splitID, ratio: 0.5)
@@ -118,12 +119,13 @@ struct PaneSplitView: View {
                             .frame(height: firstHeight)
 
                         SplitDivider(axis: .vertical)
-                            .gesture(DragGesture()
+                            .gesture(DragGesture(coordinateSpace: .named("split-\(splitID)"))
                                 .onChanged { value in
                                     let newRatio = value.location.y / geo.size.height
                                     let clamped = min(max(newRatio, minPaneSize / geo.size.height), 1 - minPaneSize / geo.size.height)
                                     paneManager.updateSplitRatio(splitID: splitID, ratio: clamped)
                                 }
+                                .onEnded { _ in NSCursor.arrow.set() }
                             )
                             .onTapGesture(count: 2) {
                                 paneManager.updateSplitRatio(splitID: splitID, ratio: 0.5)
@@ -133,6 +135,7 @@ struct PaneSplitView: View {
                     }
                 }
             }
+            .coordinateSpace(name: "split-\(splitID)")
         }
     }
 }
@@ -165,16 +168,50 @@ private struct SplitDivider: View {
             width: axis == .horizontal ? 7 : nil,
             height: axis == .vertical ? 7 : nil
         )
-        .onHover { hovering in
-            if hovering {
-                if axis == .horizontal {
-                    NSCursor.resizeLeftRight.push()
-                } else {
-                    NSCursor.resizeUpDown.push()
-                }
-            } else {
-                NSCursor.pop()
-            }
+        // AppKit cursor rects manage the resize cursor reliably — including during
+        // a drag, and they reset it when the pointer leaves — unlike onHover
+        // push/pop, which gets unbalanced mid-drag and leaves the cursor stuck.
+        .background(ResizeCursorView(axis: axis))
+    }
+}
+
+/// Hosts an AppKit cursor rect so the resize cursor shows over the divider and
+/// reliably resets when the pointer leaves or a drag ends.
+private struct ResizeCursorView: NSViewRepresentable {
+    let axis: Axis
+
+    func makeNSView(context: Context) -> CursorRectView {
+        let view = CursorRectView()
+        view.cursor = axis == .horizontal ? .resizeLeftRight : .resizeUpDown
+        return view
+    }
+
+    func updateNSView(_ nsView: CursorRectView, context: Context) {
+        nsView.cursor = axis == .horizontal ? .resizeLeftRight : .resizeUpDown
+    }
+
+    final class CursorRectView: NSView {
+        var cursor: NSCursor = .arrow
+        private var trackingArea: NSTrackingArea?
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            if let existing = trackingArea { removeTrackingArea(existing) }
+            let area = NSTrackingArea(
+                rect: .zero,
+                options: [.cursorUpdate, .activeInActiveApp, .inVisibleRect],
+                owner: self,
+                userInfo: nil
+            )
+            addTrackingArea(area)
+            trackingArea = area
+        }
+
+        // .cursorUpdate fires on pointer movement (unlike cursor rects, which only
+        // re-evaluate on click) — so the resize cursor is set on enter and AppKit
+        // restores the default when the pointer leaves, even right after a drag.
+        override func cursorUpdate(with event: NSEvent) {
+            cursor.set()
         }
     }
 }
