@@ -212,8 +212,16 @@ final class MCPHTTPServer {
             )
 
             Task { @MainActor in
-                guard let transport = server?.transport else {
+                guard let server, let transport = server.transport else {
                     connection.cancel()
+                    return
+                }
+                // Defense against DNS-rebinding / browser cross-origin: require a
+                // loopback Host and (if present) a loopback Origin. A site that
+                // rebinds its DNS to 127.0.0.1 still sends its own hostname as Host.
+                guard server.isLocalRequest(headers: parsed.headers) else {
+                    print("MCPHTTPServer: rejected request with non-local Host/Origin")
+                    sendForbidden(on: connection)
                     return
                 }
                 let response = await transport.handleRequest(httpRequest)
@@ -227,6 +235,38 @@ final class MCPHTTPServer {
                 sendHTTPResponse(response, on: connection)
             }
         }
+    }
+
+    // MARK: - Request origin validation
+
+    /// True if the request's Host (and Origin, if present) are loopback. Defeats
+    /// DNS-rebinding and browser cross-origin POSTs to the local MCP port — a
+    /// rebound site connects from 127.0.0.1 but still carries its own Host header.
+    func isLocalRequest(headers: [String: String]) -> Bool {
+        func header(_ name: String) -> String? {
+            headers.first { $0.key.lowercased() == name }?.value.lowercased()
+        }
+        let hosts: Set<String> = [
+            "localhost:\(port)", "127.0.0.1:\(port)", "[::1]:\(port)",
+            "localhost", "127.0.0.1", "[::1]",
+        ]
+        guard let host = header("host"), hosts.contains(host) else { return false }
+        if let origin = header("origin") {
+            let origins: Set<String> = [
+                "http://localhost:\(port)", "http://127.0.0.1:\(port)", "http://[::1]:\(port)",
+                "https://localhost:\(port)", "https://127.0.0.1:\(port)",
+            ]
+            if !origins.contains(origin) { return false }
+        }
+        return true
+    }
+
+    private nonisolated static func sendForbidden(on connection: NWConnection) {
+        let body = "{\"error\":\"Forbidden\"}"
+        let resp = "HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
+        connection.send(content: resp.data(using: .utf8), completion: .contentProcessed { _ in
+            connection.cancel()
+        })
     }
 
     // MARK: - Minimal HTTP parser (nonisolated)
