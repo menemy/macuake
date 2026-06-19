@@ -16,6 +16,7 @@ struct SettingsView: View {
     @AppStorage("confirmOnQuit") private var confirmOnQuit: Bool = false
     @AppStorage("restoreTabsOnLaunch") private var restoreTabsOnLaunch: Bool = true
     @AppStorage("disableAnimation") private var disableAnimation: Bool = false
+    @AppStorage("showDockIcon") private var showDockIcon: Bool = false
     @AppStorage("shellPath") private var shellPath: String = ""
     @State private var customShellPath: String = ""
     @State private var isCustomShell: Bool = false
@@ -75,6 +76,13 @@ struct SettingsView: View {
                         }
                         HStack {
                             Toggle("Disable animation", isOn: $disableAnimation)
+                            Spacer()
+                        }
+                        HStack {
+                            Toggle("Show icon in Dock", isOn: $showDockIcon)
+                                .onChange(of: showDockIcon) {
+                                    windowController.applyDockIconPolicy()
+                                }
                             Spacer()
                         }
                     }
