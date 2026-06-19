@@ -68,6 +68,26 @@ final class PaneManager: ObservableObject {
         splitPane(id: focusedPaneID, axis: axis, ratio: ratio)
     }
 
+    // MARK: - Preview (non-terminal pane)
+
+    /// Split `targetID` and place a QuickLook preview of `path` in the new pane.
+    /// Keeps focus on the source terminal. If a preview pane already exists in this
+    /// tab, swaps its file instead of opening another split.
+    @discardableResult
+    func addPreviewSplit(targetID: String, path: String, axis: Axis, ratio: CGFloat = 0.5) -> Bool {
+        if let existingID = rootPane.leafIDs.first(where: { rootPane.backend(for: $0) is PreviewBackend }),
+           let existing = rootPane.backend(for: existingID) as? PreviewBackend {
+            existing.load(path: path)
+            return true
+        }
+        guard rootPane.leafIDs.contains(targetID) else { return false }
+        let newPaneID = generateShortID()
+        let preview = PreviewBackend(path: path)
+        rootPane = splitNode(rootPane, targetID: targetID, axis: axis, newBackend: preview, newPaneID: newPaneID, ratio: ratio)
+        // Intentionally do NOT move focus — a preview pane is non-interactive.
+        return true
+    }
+
     // MARK: - Close
 
     @discardableResult

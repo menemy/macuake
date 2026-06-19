@@ -72,6 +72,22 @@ struct PaneSplitView: View {
                     tabManager.addTab(in: dir)
                 }
             }
+            .overlay(alignment: .topTrailing) {
+                // Preview panes are non-interactive — give them a visible close button.
+                if backend is PreviewBackend {
+                    Button {
+                        paneManager.closePane(id: id)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 15))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(Color.white, Color.black.opacity(0.55))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(6)
+                    .help("Close preview")
+                }
+            }
 
         case .split(let splitID, let axis, let first, let second, let ratio):
             GeometryReader { geo in
