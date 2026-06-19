@@ -57,16 +57,16 @@ jobs:
 
           # Update version in Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${{ steps.version.outputs.version }}" \
-            MaQuake/Resources/Info.plist
+            Macuake/Resources/Info.plist
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" \
-            MaQuake/Resources/Info.plist
+            Macuake/Resources/Info.plist
 
           # Copy binary (--build-system xcode outputs to .build/apple/Products/Release/)
           cp .build/apple/Products/Release/${{ env.APP_NAME }} "$APP_BUNDLE/Contents/MacOS/${{ env.APP_NAME }}"
 
           # Copy Info.plist and icon
-          cp MaQuake/Resources/Info.plist "$APP_BUNDLE/Contents/Info.plist"
-          cp MaQuake/Resources/maquake.icns "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
+          cp Macuake/Resources/Info.plist "$APP_BUNDLE/Contents/Info.plist"
+          cp Macuake/Resources/macuake.icns "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
 
           # Copy SPM resource bundles to Contents/Resources/
           # --build-system xcode generates accessor that checks Bundle.main.resourceURL
@@ -115,7 +115,7 @@ jobs:
         run: |
           APP_BUNDLE="build/${{ env.APP_NAME }}.app"
           IDENTITY="${{ secrets.SIGNING_IDENTITY }}"
-          ENTITLEMENTS="MaQuake/Resources/MaQuake.entitlements"
+          ENTITLEMENTS="Macuake/Resources/Macuake.entitlements"
 
           # Sign resource bundles in Resources/
           for bundle in "$APP_BUNDLE"/Contents/Resources/*.bundle; do

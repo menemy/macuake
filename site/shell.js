@@ -57,13 +57,13 @@ window.MQ_SHELL = {
     ['\x1b[32m XMMMMMMMMMMMMMMMMMMMMMMMX.       ', '\x1b[36mMemory:\x1b[0m 18432 MiB'],
   ],
 
-  lsOutput: ['MaQuake/', 'Package.swift', 'README.md', 'scripts/', 'vendor/', 'site/'],
+  lsOutput: ['Macuake/', 'Package.swift', 'README.md', 'scripts/', 'vendor/', 'site/'],
 
   readLines: [
     'drwxr-xr-x  12 user staff  384 Mar  7 10:22 .',
     '-rw-r--r--   1 user staff 2048 Mar  7 10:20 Package.swift',
     '-rw-r--r--   1 user staff  890 Mar  7 09:30 README.md',
-    'drwxr-xr-x   8 user staff  256 Mar  7 10:22 MaQuake',
+    'drwxr-xr-x   8 user staff  256 Mar  7 10:22 Macuake',
     'drwxr-xr-x   4 user staff  128 Mar  7 09:15 scripts',
   ],
 
