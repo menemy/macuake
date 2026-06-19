@@ -24,6 +24,13 @@ final class PreviewBackend: TerminalBackend {
     }
 
     private func setupView() {
+        // macuake is always dark — force the preview (and the out-of-process QuickLook
+        // extensions it hosts) to render in dark mode, so content comes back as
+        // light-on-dark instead of a white panel or unreadable dark-on-dark.
+        container.wantsLayer = true
+        container.layer?.backgroundColor = NSColor.black.cgColor
+        container.appearance = NSAppearance(named: .darkAqua)
+        previewView.appearance = NSAppearance(named: .darkAqua)
         previewView.autostarts = true
         previewView.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(previewView)
