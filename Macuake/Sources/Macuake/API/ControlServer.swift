@@ -12,7 +12,7 @@ final class ControlServer {
     private var readSource: DispatchSourceRead?
     private weak var windowController: WindowController?
     /// Serial queue ensures requests are processed one at a time.
-    private let requestQueue = DispatchQueue(label: "com.macuake.api")
+    private let requestQueue = DispatchQueue(label: "com.maquake.app.api")
 
     /// API access: "ask" = prompt on first request, "enabled", "disabled"
     @MainActor static var accessState: String {
