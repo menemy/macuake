@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build Maquake, sign it, and optionally install to /Applications.
+# Build Macuake, sign it, and optionally install to /Applications.
 # Usage: ./scripts/build-install.sh [--install]
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_BUNDLE="$PROJECT_ROOT/build/Macuake.app"
-ENTITLEMENTS="$PROJECT_ROOT/MaQuake/Resources/MaQuake.entitlements"
+ENTITLEMENTS="$PROJECT_ROOT/Macuake/Resources/Macuake.entitlements"
 BINARY="$APP_BUNDLE/Contents/MacOS/Macuake"
 SIGNING_IDENTITY="Developer ID Application: Denti.AI Technology Inc (45N4N4R4C3)"
 
@@ -26,12 +26,18 @@ echo "==> Copying binary..."
 cp .build/apple/Products/Release/Macuake "$BINARY"
 
 echo "==> Copying Info.plist..."
-cp "$PROJECT_ROOT/MaQuake/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
+cp "$PROJECT_ROOT/Macuake/Resources/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 
 echo "==> Copying icon..."
 RESOURCES_DIR="$APP_BUNDLE/Contents/Resources"
 mkdir -p "$RESOURCES_DIR"
-cp "$PROJECT_ROOT/MaQuake/Resources/maquake.icns" "$RESOURCES_DIR/" 2>/dev/null || true
+cp "$PROJECT_ROOT/Macuake/Resources/macuake.icns" "$RESOURCES_DIR/" 2>/dev/null || true
+
+echo "==> Copying markdown preview assets..."
+# Bundled marked.js + highlight.js + mermaid.js + GitHub CSS for the file-preview pane.
+# Copied directly (not via SwiftPM .process, which silently drops out-of-target resources).
+rm -rf "$RESOURCES_DIR/markdown"
+cp -R "$PROJECT_ROOT/Macuake/Resources/markdown" "$RESOURCES_DIR/markdown"
 
 echo "==> Copying resource bundles..."
 for bundle in .build/apple/Products/Release/*.bundle; do

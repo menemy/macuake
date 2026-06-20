@@ -1,13 +1,13 @@
-# maquake Control API
+# macuake Control API
 
-Unix domain socket server at `/tmp/maquake.sock`. Send JSON, receive JSON.
+Unix domain socket server at `/tmp/macuake.sock`. Send JSON, receive JSON.
 
 ## Protocol
 
 Connect to the socket, send a single JSON object with an `"action"` field, read the response. Each response has `"ok": true/false`. On error: `"error": "message"`.
 
 ```bash
-echo '{"action":"state"}' | nc -U /tmp/maquake.sock
+echo '{"action":"state"}' | nc -U /tmp/macuake.sock
 ```
 
 ## Actions

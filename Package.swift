@@ -10,6 +10,8 @@ let package = Package(
         .package(url: "https://github.com/sindresorhus/KeyboardShortcuts.git", from: "2.0.0"),
         .package(url: "https://github.com/sparkle-project/Sparkle.git", from: "2.0.0"),
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.7.1"),
+        .package(url: "https://github.com/JohnSundell/Ink.git", from: "0.5.0"),
+        .package(url: "https://github.com/raspu/Highlightr.git", from: "2.2.0"),
     ],
     targets: [
         .binaryTarget(
@@ -23,8 +25,10 @@ let package = Package(
                 "GhosttyKit",
                 .product(name: "Sparkle", package: "Sparkle"),
                 .product(name: "MCP", package: "swift-sdk"),
+                "Ink",
+                "Highlightr",
             ],
-            path: "MaQuake/Sources/MaQuake",
+            path: "Macuake/Sources/Macuake",
             resources: [
                 .process("../../Resources"),
             ],
@@ -38,7 +42,7 @@ let package = Package(
         .testTarget(
             name: "MacuakeTests",
             dependencies: ["Macuake"],
-            path: "MaQuake/Tests/MaQuakeTests"
+            path: "Macuake/Tests/MacuakeTests"
         ),
     ]
 )

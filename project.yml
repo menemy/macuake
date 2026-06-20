@@ -1,6 +1,6 @@
 name: Macuake
 options:
-  bundleIdPrefix: com.macuake
+  bundleIdPrefix: com.maquake
   deploymentTarget:
     macOS: "14.0"
 
@@ -11,7 +11,7 @@ targets:
     sources: []
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.macuake.terminal
+        PRODUCT_BUNDLE_IDENTIFIER: com.maquake.app
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_IDENTITY: "-"
         PRODUCT_NAME: Macuake
@@ -27,6 +27,6 @@ targets:
     settings:
       base:
         TEST_TARGET_NAME: Macuake
-        PRODUCT_BUNDLE_IDENTIFIER: com.macuake.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: com.maquake.uitests
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: "5.0"

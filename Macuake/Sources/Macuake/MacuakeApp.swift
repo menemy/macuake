@@ -2,6 +2,18 @@ import SwiftUI
 import AppKit
 import KeyboardShortcuts
 
+/// Controls whether macuake shows a Dock icon, driven by the `showDockIcon` setting.
+/// Default is off (accessory / LSUIElement) — menu-bar item only.
+enum DockIconPolicy {
+    static let key = "showDockIcon"
+
+    @MainActor
+    static func apply() {
+        let show = UserDefaults.standard.bool(forKey: key)
+        NSApp.setActivationPolicy(show ? .regular : .accessory)
+    }
+}
+
 @main
 struct MacuakeApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -46,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var debugWindow: DebugTerminalWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        DockIconPolicy.apply()
         GhosttyApp.shared.initialize()
 
         // Launch debug terminal window if --debug-window flag is passed
@@ -148,6 +160,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func checkForUpdates() {
         SparkleUpdater.shared.checkForUpdates()
+    }
+
+    /// Clicking the Dock icon toggles the terminal. A click on a visible panel is
+    /// first seen by the defocus observers (which hide it); if this reopen is the
+    /// tail of that same hide, don't re-open — otherwise toggle.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if windowController.consumeDefocusHide() { return true }
+        windowController.toggle()
+        return true
     }
 
     func applicationWillTerminate(_ notification: Notification) {

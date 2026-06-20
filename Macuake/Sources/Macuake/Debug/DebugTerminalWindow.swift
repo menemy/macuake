@@ -2,7 +2,7 @@ import AppKit
 import GhosttyKit
 import os.log
 
-private let log = OSLog(subsystem: "com.macuake", category: "DebugWindow")
+private let log = OSLog(subsystem: "com.maquake.app", category: "DebugWindow")
 
 /// Minimal test window — plain opaque NSWindow with GhosttyBackend directly.
 /// No SwiftUI, no NSPanel, no animation. For diagnosing transparency issues.
