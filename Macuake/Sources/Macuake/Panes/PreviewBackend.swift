@@ -20,7 +20,7 @@ import Highlightr
 ///   - Image      → `NSImageView`
 ///   - Video/audio→ `AVPlayerView`
 ///   - Anything else → a "preview not supported" placeholder.
-final class PreviewBackend: TerminalBackend {
+final class PreviewBackend: TerminalBackend, NonTerminalBackend {
     private let container = NSView()
     private var renderer: NSView?
     private var focusTarget: NSView?

@@ -200,6 +200,7 @@ final class ControlServer {
         case "split":         return handleSplit(json, wc)
         case "resize-split":  return handleResizeSplit(json, wc)
         case "preview-file":  return handlePreviewFile(json, wc)
+        case "preview-cdp":   return handleCDP(json, wc)
         case "set-appearance": return handleSetAppearance(json, wc)
         default:              return jsonError("unknown action: \(action)")
         }
@@ -499,6 +500,46 @@ final class ControlServer {
             return jsonError("preview failed")
         }
         return jsonOK(["preview_path": expanded])
+    }
+
+    @MainActor
+    private func handleCDP(_ json: [String: Any], _ wc: WindowController) -> String {
+        // CDP endpoint as host:port (default localhost:9222). The DevTools port grants full
+        // control of the browser, so only loopback hosts are allowed — no remote targets.
+        let endpoint = (json["endpoint"] as? String ?? "localhost:9222").trimmingCharacters(in: .whitespaces)
+        let host = endpoint.contains(":") ? String(endpoint[..<endpoint.lastIndex(of: ":")!]) : endpoint
+        let loopback: Set<String> = ["localhost", "127.0.0.1", "::1", "[::1]", ""]
+        guard loopback.contains(host) else {
+            return jsonError("endpoint must be loopback (localhost / 127.0.0.1); got \"\(host)\". Tunnel remote browsers over SSH to localhost.")
+        }
+
+        let direction = json["direction"] as? String ?? "h"
+        guard direction == "h" || direction == "v" else {
+            return jsonError("direction must be \"h\" or \"v\"")
+        }
+        let axis: Axis = direction == "h" ? .horizontal : .vertical
+        let ratio = CGFloat(json["ratio"] as? Double ?? 0.5)
+
+        let pm: PaneManager
+        let targetID: String
+        if let sid = json["session_id"] as? String {
+            guard let (_, _, foundPM) = findSession(sid, wc) else {
+                return jsonError("session not found: \(sid)")
+            }
+            pm = foundPM
+            targetID = sid
+        } else {
+            guard let tab = wc.tabManager.activeTab, let activePM = tab.paneManager else {
+                return jsonError("no active terminal tab")
+            }
+            pm = activePM
+            targetID = activePM.focusedPaneID
+        }
+
+        guard pm.addCDPSplit(targetID: targetID, endpoint: endpoint, axis: axis, ratio: ratio) else {
+            return jsonError("cdp preview failed")
+        }
+        return jsonOK(["endpoint": endpoint])
     }
 
     @MainActor
