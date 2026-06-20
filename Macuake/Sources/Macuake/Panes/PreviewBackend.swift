@@ -95,8 +95,10 @@ final class PreviewBackend: TerminalBackend, NonTerminalBackend {
     private func installImage(_ url: URL) {
         let v = NSImageView()
         v.image = NSImage(contentsOf: url)
-        // Fit within the pane, never upscale (a 2048² image must not blow up the split).
-        v.imageScaling = .scaleProportionallyDown
+        // SVG is vector → fill the pane (scaling up is lossless). Raster → scale down only:
+        // never upscale a small bitmap (blur), never let a huge one (2048²) blow up the split.
+        let isVector = url.pathExtension.lowercased() == "svg"
+        v.imageScaling = isVector ? .scaleProportionallyUpOrDown : .scaleProportionallyDown
         v.imageAlignment = .alignCenter
         // The image's intrinsic size must NOT drive the pane layout: the container is
         // returned straight to SwiftUI, which measures its fitting size. Lower hugging /
