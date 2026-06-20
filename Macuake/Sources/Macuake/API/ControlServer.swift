@@ -218,7 +218,8 @@ final class ControlServer {
                 "active": i == wc.tabManager.activeTabIndex,
             ]
             if let pm = tab.paneManager {
-                let sessions = pm.rootPane.leafIDs.map { sid -> [String: Any] in
+                // Only real terminal sessions — preview panes are not sessions.
+                let sessions = pm.terminalLeafIDs.map { sid -> [String: Any] in
                     let inst = pm.instance(for: sid)
                     return [
                         "session_id": sid,
