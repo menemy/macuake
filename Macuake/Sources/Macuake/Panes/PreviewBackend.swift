@@ -43,17 +43,24 @@ final class PreviewBackend: TerminalBackend {
 
     private static let markdownExtensions: Set<String> = ["md", "markdown", "mdown", "mkd"]
 
-    private func kind(for url: URL) -> Kind {
+    private static func kind(for url: URL) -> Kind {
         let ext = url.pathExtension.lowercased()
-        if Self.markdownExtensions.contains(ext) { return .markdown }
+        if markdownExtensions.contains(ext) { return .markdown }
         if let ut = UTType(filenameExtension: ext) {
             if ut.conforms(to: .pdf) { return .pdf }
             if ut.conforms(to: .image) { return .image }
             if ut.conforms(to: .movie) || ut.conforms(to: .audiovisualContent) || ut.conforms(to: .audio) { return .media }
             if ut.conforms(to: .sourceCode) || ut.conforms(to: .text) || ut.conforms(to: .shellScript) { return .code }
         }
-        if Self.highlightSyntax(for: ext) != nil { return .code }
+        if highlightSyntax(for: ext) != nil { return .code }
         return .unsupported
+    }
+
+    /// Whether `preview_file` can render this path. The API/MCP layer gates on this and
+    /// returns an error (opening NO pane) for unsupported types — nothing is shown.
+    static func isSupported(path: String) -> Bool {
+        let expanded = (path as NSString).expandingTildeInPath
+        return kind(for: URL(fileURLWithPath: expanded)) != .unsupported
     }
 
     func load(path: String) {
@@ -63,7 +70,7 @@ final class PreviewBackend: TerminalBackend {
         player?.pause()
         player = nil
 
-        switch kind(for: url) {
+        switch Self.kind(for: url) {
         case .pdf:         installPDF(url)
         case .markdown:    installMarkdown(url)
         case .code:        installCode(url)
@@ -87,8 +94,16 @@ final class PreviewBackend: TerminalBackend {
     private func installImage(_ url: URL) {
         let v = NSImageView()
         v.image = NSImage(contentsOf: url)
-        v.imageScaling = .scaleProportionallyUpOrDown
+        // Fit within the pane, never upscale (a 2048² image must not blow up the split).
+        v.imageScaling = .scaleProportionallyDown
         v.imageAlignment = .alignCenter
+        // The image's intrinsic size must NOT drive the pane layout: the container is
+        // returned straight to SwiftUI, which measures its fitting size. Lower hugging /
+        // compression resistance so the edge constraints (not the 2048² intrinsic) win.
+        v.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        v.setContentHuggingPriority(.defaultLow, for: .vertical)
+        v.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        v.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
         install(v, focus: v)
     }
 
@@ -217,7 +232,9 @@ final class PreviewBackend: TerminalBackend {
     private static func highlightToRTF(url: URL) -> NSAttributedString? {
         guard let bin = highlightBinary else { return nil }
         let ext = url.pathExtension.lowercased()
-        var args = ["-O", "rtf", "--style", "anotherdark", "--font", "Menlo", "--font-size", "12"]
+        // darkplus = VS Code Dark+: blue keywords, orange strings, distinct JSON keys/values
+        // (anotherdark rendered JSON almost entirely red).
+        var args = ["-O", "rtf", "--style", "darkplus", "--font", "Menlo", "--font-size", "12"]
         if let syn = highlightSyntax(for: ext) { args += ["-S", syn] }
         args.append(url.path)
 
