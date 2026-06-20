@@ -13,7 +13,8 @@ import Ink
 ///
 /// Supported, interactive (scroll / select / copy):
 ///   - PDF        → PDFKit `PDFView`
-///   - Markdown   → Ink (md→HTML) + GitHub-style CSS in a `WKWebView`
+///   - Markdown   → bundled marked.js + github-markdown-dark.css + highlight.js +
+///                  mermaid.js in a `WKWebView` (GFM tables + diagrams); Ink fallback
 ///   - Code/text  → André Simon `highlight` → RTF → read-only `NSTextView`
 ///   - Image      → `NSImageView`
 ///   - Video/audio→ `AVPlayerView`
@@ -103,11 +104,20 @@ final class PreviewBackend: TerminalBackend {
 
     private func installMarkdown(_ url: URL) {
         let md = Self.readText(url)
-        let body = MarkdownParser().html(from: md)
-        let html = "<!doctype html><html><head><meta charset='utf-8'><style>\(Self.markdownCSS)</style></head><body class='markdown-body'>\(body)</body></html>"
-        let web = WKWebView()
+        let web = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
         web.setValue(false, forKey: "drawsBackground")  // transparent → our dark container shows through pre-paint
-        web.loadHTMLString(html, baseURL: url.deletingLastPathComponent())
+        if #available(macOS 12.0, *) {
+            web.underPageBackgroundColor = Self.canvasColor  // avoids white flash before first paint
+        }
+        if let html = Self.markdownHTML(markdown: md) {
+            // Primary path: bundled marked + highlight.js + mermaid → GFM tables & diagrams.
+            web.loadHTMLString(html, baseURL: url.deletingLastPathComponent())
+        } else {
+            // Fallback (bundled assets missing): Ink, no tables/diagrams.
+            let body = MarkdownParser().html(from: md)
+            let html = "<!doctype html><html><head><meta charset='utf-8'><style>\(Self.markdownCSS)</style></head><body class='markdown-body'>\(body)</body></html>"
+            web.loadHTMLString(html, baseURL: url.deletingLastPathComponent())
+        }
         install(web, focus: web)
     }
 
@@ -222,6 +232,106 @@ final class PreviewBackend: TerminalBackend {
         proc.waitUntilExit()
         guard proc.terminationStatus == 0, !data.isEmpty else { return nil }
         return NSAttributedString(rtf: data, documentAttributes: nil)
+    }
+
+    // MARK: - Markdown (bundled-JS pipeline)
+
+    /// GitHub dark canvas color (#0d1117) — used as the WebView's pre-paint background.
+    private static let canvasColor = NSColor(srgbRed: 0x0d / 255, green: 0x11 / 255, blue: 0x17 / 255, alpha: 1)
+
+    /// Read a bundled markdown asset (js/css) from `Resources/markdown/`. The assets ship
+    /// inside the SPM-generated `Macuake_Macuake.bundle`; we locate that bundle relative to
+    /// the executable/app and also accept assets copied straight into a Resources dir — so
+    /// it resolves under `swift build`, the dev `.app`, and the release `.app`.
+    /// (Avoids `Bundle.module`, which for this executable target resolves to a dependency's
+    /// inaccessible accessor.)
+    private static func markdownAsset(_ name: String) -> String? {
+        let fm = FileManager.default
+        var bases: [URL] = []
+        if let r = Bundle.main.resourceURL { bases.append(r) }
+        bases.append(Bundle.main.bundleURL)
+        if let exeDir = Bundle.main.executableURL?.deletingLastPathComponent() { bases.append(exeDir) }
+
+        var dirs: [URL] = []
+        for base in bases {
+            dirs.append(base.appendingPathComponent("markdown"))
+            let pkg = base.appendingPathComponent("Macuake_Macuake.bundle")
+            dirs.append(pkg.appendingPathComponent("Resources/markdown"))          // shallow bundle
+            dirs.append(pkg.appendingPathComponent("Contents/Resources/markdown"))  // deep bundle
+        }
+        for dir in dirs {
+            let file = dir.appendingPathComponent(name)
+            if fm.fileExists(atPath: file.path), let s = try? String(contentsOf: file, encoding: .utf8) { return s }
+        }
+        return nil
+    }
+
+    // Cache asset bodies (mermaid.min.js alone is ~3 MB — read once, reuse every render).
+    private static let markedJS = markdownAsset("marked.min.js")
+    private static let hljsJS = markdownAsset("highlight.min.js")
+    private static let mermaidJS = markdownAsset("mermaid.min.js")
+    private static let githubMarkdownCSS = markdownAsset("github-markdown-dark.css")
+    private static let hljsCSS = markdownAsset("github-dark.min.css")
+
+    /// Build a self-contained HTML document that renders `markdown` client-side with
+    /// marked (GFM tables), highlight.js (code blocks) and mermaid (diagrams).
+    /// Returns nil if any bundled asset is missing (caller falls back to Ink).
+    private static func markdownHTML(markdown: String) -> String? {
+        guard let marked = markedJS, let hljs = hljsJS, let mermaid = mermaidJS,
+              let ghCSS = githubMarkdownCSS, let hlCSS = hljsCSS else { return nil }
+
+        // JSON-encode the markdown so it embeds safely inside a <script> string literal.
+        // JSONEncoder escapes `/` as `\/` (so `</script>` can't close the tag); also guard
+        // the JS line-separator code points that JSON leaves raw.
+        let raw: String
+        if let data = try? JSONEncoder().encode(markdown), let s = String(data: data, encoding: .utf8) {
+            raw = s.replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+                   .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
+        } else {
+            raw = "\"\""
+        }
+
+        return """
+        <!doctype html><html><head><meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>\(ghCSS)</style>
+        <style>\(hlCSS)</style>
+        <style>
+          html,body { background:#0d1117; margin:0; padding:0; }
+          .markdown-body { box-sizing:border-box; max-width:980px; margin:0 auto; padding:32px 28px; background:#0d1117; }
+          .mermaid { background:transparent; text-align:center; margin:16px 0; }
+        </style>
+        </head>
+        <body>
+        <article id="content" class="markdown-body"></article>
+        <script>\(marked)</script>
+        <script>\(hljs)</script>
+        <script>\(mermaid)</script>
+        <script>
+          (function(){
+            var RAW = \(raw);
+            var el = document.getElementById('content');
+            try { el.innerHTML = marked.parse(RAW); }
+            catch(e){ el.textContent = String(RAW); return; }
+            // Promote ```mermaid fenced blocks into <div class="mermaid"> nodes.
+            el.querySelectorAll('pre code.language-mermaid').forEach(function(code){
+              var div = document.createElement('div');
+              div.className = 'mermaid';
+              div.textContent = code.textContent;
+              code.parentElement.replaceWith(div);
+            });
+            // Syntax-highlight the remaining fenced code blocks.
+            el.querySelectorAll('pre code').forEach(function(code){
+              try { hljs.highlightElement(code); } catch(e){}
+            });
+            try {
+              mermaid.initialize({ startOnLoad:false, theme:'dark', securityLevel:'strict' });
+              mermaid.run({ querySelector:'.mermaid' });
+            } catch(e){}
+          })();
+        </script>
+        </body></html>
+        """
     }
 
     private static let markdownCSS = """

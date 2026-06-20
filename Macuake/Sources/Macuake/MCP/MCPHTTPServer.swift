@@ -463,7 +463,7 @@ final class MCPHTTPServer {
                     "session_id": .object(["type": .string("string"), "description": .string("Target session (default: focused)")])
                 ])
              ])),
-        Tool(name: "preview_file", description: "Preview a local file (image, PDF, video, source code, Office doc, etc.) in a split pane beside the terminal via QuickLook. Path must be a local file the agent has written or can read.",
+        Tool(name: "preview_file", description: "Preview a local file in a scrollable, selectable split pane beside the terminal. Renders natively by type: Markdown (GFM tables + mermaid diagrams + syntax-highlighted code), source code (syntax highlighted), PDF, images, and video/audio. Unsupported types show a placeholder. Path must be a local file the agent has written or can read.",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([

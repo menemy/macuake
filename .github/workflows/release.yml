@@ -68,6 +68,11 @@ jobs:
           cp Macuake/Resources/Info.plist "$APP_BUNDLE/Contents/Info.plist"
           cp Macuake/Resources/macuake.icns "$APP_BUNDLE/Contents/Resources/" 2>/dev/null || true
 
+          # Copy markdown preview assets (marked/highlight/mermaid + GitHub CSS).
+          # Copied directly because SwiftPM .process drops out-of-target resources.
+          rm -rf "$APP_BUNDLE/Contents/Resources/markdown"
+          cp -R Macuake/Resources/markdown "$APP_BUNDLE/Contents/Resources/markdown"
+
           # Copy SPM resource bundles to Contents/Resources/
           # --build-system xcode generates accessor that checks Bundle.main.resourceURL
           for bundle in .build/apple/Products/Release/*.bundle; do
