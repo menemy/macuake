@@ -4,6 +4,7 @@ import AVKit
 import WebKit
 import UniformTypeIdentifiers
 import Ink
+import Highlightr
 
 /// A non-terminal pane leaf that previews a local file with a NATIVE per-type viewer.
 ///
@@ -15,7 +16,7 @@ import Ink
 ///   - PDF        → PDFKit `PDFView`
 ///   - Markdown   → bundled marked.js + github-markdown-dark.css + highlight.js +
 ///                  mermaid.js in a `WKWebView` (GFM tables + diagrams); Ink fallback
-///   - Code/text  → André Simon `highlight` → RTF → read-only `NSTextView`
+///   - Code/text  → Highlightr (highlight.js via JavaScriptCore) → read-only `NSTextView`
 ///   - Image      → `NSImageView`
 ///   - Video/audio→ `AVPlayerView`
 ///   - Anything else → a "preview not supported" placeholder.
@@ -52,7 +53,7 @@ final class PreviewBackend: TerminalBackend {
             if ut.conforms(to: .movie) || ut.conforms(to: .audiovisualContent) || ut.conforms(to: .audio) { return .media }
             if ut.conforms(to: .sourceCode) || ut.conforms(to: .text) || ut.conforms(to: .shellScript) { return .code }
         }
-        if highlightSyntax(for: ext) != nil { return .code }
+        if codeLanguage(for: ext) != nil { return .code }
         return .unsupported
     }
 
@@ -139,13 +140,14 @@ final class PreviewBackend: TerminalBackend {
     private func installCode(_ url: URL) {
         let scroll = makeTextScroll()
         let text = scroll.documentView as! NSTextView
-        if let attr = Self.highlightToRTF(url: url) {
+        let code = Self.readText(url)
+        let lang = Self.codeLanguage(for: url.pathExtension.lowercased())  // nil → auto-detect
+        if let hl = Self.highlighter, let attr = hl.highlight(code, as: lang, fastRender: true) {
             text.textStorage?.setAttributedString(attr)
-            // The RTF carries its own colors; ensure the view background stays dark.
-            text.backgroundColor = .black
+            text.backgroundColor = hl.theme.themeBackgroundColor
         } else {
             // Fallback: plain monospaced text.
-            text.string = Self.readText(url)
+            text.string = code
             text.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
             text.textColor = NSColor(white: 0.9, alpha: 1)
         }
@@ -202,53 +204,31 @@ final class PreviewBackend: TerminalBackend {
         return truncated ? body + "\n\n… (truncated)" : body
     }
 
-    /// Locate the André Simon `highlight` binary (bundled first, then common install paths).
-    private static var highlightBinary: String? = {
-        let candidates = [
-            Bundle.main.resourceURL?.appendingPathComponent("highlight/highlight").path,
-            "/opt/homebrew/bin/highlight",
-            "/usr/local/bin/highlight",
-            "/usr/bin/highlight",
-        ].compactMap { $0 }
-        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    /// Shared syntax highlighter — highlight.js running in-process via JavaScriptCore
+    /// (Highlightr). No external binary, no spawned process. `github-dark` matches the
+    /// markdown code blocks; Menlo 12 matches the terminal.
+    private static let highlighter: Highlightr? = {
+        guard let h = Highlightr() else { return nil }
+        h.setTheme(to: "github-dark")
+        h.theme.setCodeFont(NSFont(name: "Menlo", size: 12) ?? .monospacedSystemFont(ofSize: 12, weight: .regular))
+        return h
     }()
 
-    /// Map a file extension to a `highlight` syntax name where the extension alone is ambiguous.
-    private static func highlightSyntax(for ext: String) -> String? {
+    /// Map a file extension to a highlight.js language name. Returns nil for extensions we
+    /// don't pin (Highlightr then auto-detects). Also used by `kind(for:)` to classify code.
+    private static func codeLanguage(for ext: String) -> String? {
         let map: [String: String] = [
-            "swift": "swift", "py": "python", "js": "js", "mjs": "js", "ts": "ts",
-            "jsx": "js", "tsx": "ts", "go": "go", "rs": "rust", "rb": "ruby",
-            "c": "c", "h": "c", "cpp": "cpp", "cc": "cpp", "hpp": "cpp", "m": "objc",
-            "mm": "objc", "java": "java", "kt": "kotlin", "php": "php", "sh": "bash",
-            "bash": "bash", "zsh": "bash", "json": "json", "yml": "yaml", "yaml": "yaml",
-            "toml": "toml", "html": "html", "css": "css", "xml": "xml", "sql": "sql",
-            "lua": "lua", "pl": "perl", "r": "r", "scala": "scala", "diff": "diff",
-            "patch": "diff", "txt": "txt", "conf": "conf", "ini": "ini", "make": "make",
+            "swift": "swift", "py": "python", "js": "javascript", "mjs": "javascript",
+            "ts": "typescript", "jsx": "javascript", "tsx": "typescript", "go": "go",
+            "rs": "rust", "rb": "ruby", "c": "c", "h": "c", "cpp": "cpp", "cc": "cpp",
+            "hpp": "cpp", "m": "objectivec", "mm": "objectivec", "java": "java",
+            "kt": "kotlin", "php": "php", "sh": "bash", "bash": "bash", "zsh": "bash",
+            "json": "json", "yml": "yaml", "yaml": "yaml", "toml": "ini", "html": "xml",
+            "css": "css", "xml": "xml", "sql": "sql", "lua": "lua", "pl": "perl",
+            "r": "r", "scala": "scala", "diff": "diff", "patch": "diff", "txt": "plaintext",
+            "conf": "ini", "ini": "ini", "make": "makefile", "mk": "makefile",
         ]
         return map[ext]
-    }
-
-    /// Run `highlight -O rtf` and return an attributed string, or nil if unavailable.
-    private static func highlightToRTF(url: URL) -> NSAttributedString? {
-        guard let bin = highlightBinary else { return nil }
-        let ext = url.pathExtension.lowercased()
-        // darkplus = VS Code Dark+: blue keywords, orange strings, distinct JSON keys/values
-        // (anotherdark rendered JSON almost entirely red).
-        var args = ["-O", "rtf", "--style", "darkplus", "--font", "Menlo", "--font-size", "12"]
-        if let syn = highlightSyntax(for: ext) { args += ["-S", syn] }
-        args.append(url.path)
-
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: bin)
-        proc.arguments = args
-        let out = Pipe()
-        proc.standardOutput = out
-        proc.standardError = Pipe()
-        do { try proc.run() } catch { return nil }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        proc.waitUntilExit()
-        guard proc.terminationStatus == 0, !data.isEmpty else { return nil }
-        return NSAttributedString(rtf: data, documentAttributes: nil)
     }
 
     // MARK: - Markdown (bundled-JS pipeline)
