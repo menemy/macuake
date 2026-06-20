@@ -465,6 +465,11 @@ final class ControlServer {
         guard FileManager.default.fileExists(atPath: expanded) else {
             return jsonError("file not found: \(expanded)")
         }
+        // Unsupported types open NO pane — just report back to the caller (API/MCP).
+        guard PreviewBackend.isSupported(path: expanded) else {
+            let ext = (expanded as NSString).pathExtension
+            return jsonError("cannot preview .\(ext) — supported: markdown, source code, PDF, images, audio/video")
+        }
         let direction = json["direction"] as? String ?? "h"
         guard direction == "h" || direction == "v" else {
             return jsonError("direction must be \"h\" or \"v\"")
