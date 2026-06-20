@@ -1,5 +1,5 @@
 {
-  "originHash" : "a6b04f292f2e4417a377070991ec32f2e9fe459f1d7ba2df28395f65dee74cc2",
+  "originHash" : "dc94c41abe00cb8f1b90637ae935de9763732bd30b10b658df68b706fd652cc5",
   "pins" : [
     {
       "identity" : "eventsource",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "a3a85a85214caf642abaa96ae664e4c772a59f6e",
         "version" : "1.4.1"
+      }
+    },
+    {
+      "identity" : "ink",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/JohnSundell/Ink.git",
+      "state" : {
+        "revision" : "bcc9f219900a62c4210e6db726035d7f03ae757b",
+        "version" : "0.6.0"
       }
     },
     {
