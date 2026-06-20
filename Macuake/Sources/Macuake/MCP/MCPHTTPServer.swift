@@ -32,6 +32,7 @@ final class MCPHTTPServer {
         let server = Server(
             name: "macuake",
             version: version,
+            instructions: Self.serverInstructions,
             capabilities: .init(tools: .init(listChanged: false))
         )
         self.mcpServer = server
@@ -355,6 +356,34 @@ final class MCPHTTPServer {
 
     // MARK: - Tool definitions
 
+    /// Server-level overview sent to the client on connect — what macuake is and how the
+    /// tools fit together, so the agent picks the right one.
+    nonisolated static let serverInstructions = """
+    macuake is a Quake-style drop-down terminal for macOS that the user sees on screen. \
+    These tools let you drive that VISIBLE terminal as a sidecar: run commands the user \
+    watches, read their output, and show files or a live browser beside the terminal.
+
+    Typical flow: `list` to see tabs/sessions (each has an 8-char session_id) → `new_tab` to \
+    open one → `execute` to run a command → `read` to get its output. Omit session_id to \
+    target the focused pane.
+
+    - Run/observe: execute, read, paste, control_char, clear.
+    - Window & layout: show / hide / toggle / pin / unpin; new_tab, split, focus, \
+      resize_split, close_session, set_appearance; state, list.
+    - preview_file: open a local file (markdown, source code, PDF, image, audio/video) in a \
+      scrollable, selectable split pane beside the terminal.
+    - preview_cdp: mirror a Chrome tab live in a split pane via the DevTools screencast \
+      (loopback only) — watch the browser and click/scroll/type to take over. If no debuggable \
+      Chrome is running, start one with --remote-debugging-port first (see the tool's description).
+
+    Be proactive: when you produce a file the user would want to see (report, diff, chart, \
+    generated image, PDF) call preview_file to show it; when you drive a browser, call \
+    preview_cdp so the user can watch.
+
+    Commands run in real shells the user shares — prefer non-destructive actions and let the \
+    user see what you do.
+    """
+
     nonisolated static let allTools: [Tool] = [
         Tool(name: "state", description: "Get terminal state (visible, pinned, tab count, active session)",
              inputSchema: .object(["type": .string("object"), "properties": .object([:])]) ),
@@ -463,7 +492,7 @@ final class MCPHTTPServer {
                     "session_id": .object(["type": .string("string"), "description": .string("Target session (default: focused)")])
                 ])
              ])),
-        Tool(name: "preview_file", description: "Preview a local file in a scrollable, selectable split pane beside the terminal. Renders natively by type: Markdown (GFM tables + mermaid diagrams + syntax-highlighted code), source code (syntax highlighted), PDF, images, and video/audio. Unsupported types return an error and open no pane. Path must be a local file the agent has written or can read.",
+        Tool(name: "preview_file", description: "Show a local file to the user in a scrollable, selectable split pane beside the terminal. Use it to surface something you produced or inspected — a report, diff, chart, generated image, screenshot, PDF, etc. Renders natively by type: Markdown .md/.markdown (GFM tables + mermaid diagrams + highlighted code), source code & text (.swift/.py/.js/.ts/.go/.rs/.json/.yaml/.sql/.sh/.diff and many more — syntax highlighted), PDF (.pdf), images (.png/.jpg/.gif/.webp/.svg…), audio/video (.mp4/.mov/.mp3…). Unsupported types return an error and open no pane (nothing is shown). Path must be a local file you wrote or can read.",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
@@ -474,7 +503,7 @@ final class MCPHTTPServer {
                 ]),
                 "required": .array([.string("path")])
              ])),
-        Tool(name: "preview_cdp", description: "Mirror a Chrome/Chromium tab (the agent's browser) live in a split pane via the DevTools screencast protocol. The browser must run with --remote-debugging-port; only loopback endpoints are allowed (tunnel remote browsers over SSH). This is a live preview — you watch and can click/scroll/type to take over; it is not a full browser.",
+        Tool(name: "preview_cdp", description: "Mirror a Chrome/Chromium tab live in a split pane (DevTools screencast) so the user sees the browser; you can also click/scroll/type to take over. Use it to show browser automation, a rendered web page, or an agent-driven browsing session. PREREQUISITE: a Chromium browser running with remote debugging on a loopback port. If none is running, start a dedicated instance yourself via the execute tool, e.g. on macOS: open -na \"Google Chrome\" --args --remote-debugging-port=9222 --user-data-dir=/tmp/macuake-cdp — then drive it (Playwright/Puppeteer/manual) and call preview_cdp. Loopback endpoints only (default localhost:9222); tunnel remote browsers over SSH. The pane follows the active tab. Not a full browser — for local video files use preview_file.",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
