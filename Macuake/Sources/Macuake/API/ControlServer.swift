@@ -20,6 +20,14 @@ final class ControlServer {
         set { UserDefaults.standard.set(newValue, forKey: "apiAccess") }
     }
 
+    /// Whether preview panels (preview_file / preview_cdp) may be opened via API/MCP.
+    /// Off by default — the user opts in via Settings → API.
+    static var previewPanelsEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "mcpPreviewPanels")
+    }
+
+    static let previewsDisabledError = jsonError("preview panels are disabled — enable them in Settings → API (\"Enable preview panels\")")
+
     init(windowController: WindowController, socketPath: String = "/tmp/macuake.sock", startImmediately: Bool = true) {
         self.socketPath = socketPath
         self.windowController = windowController
@@ -460,6 +468,7 @@ final class ControlServer {
 
     @MainActor
     private func handlePreviewFile(_ json: [String: Any], _ wc: WindowController) -> String {
+        guard Self.previewPanelsEnabled else { return Self.previewsDisabledError }
         guard let path = json["path"] as? String, !path.isEmpty else {
             return jsonError("missing path")
         }
@@ -504,6 +513,7 @@ final class ControlServer {
 
     @MainActor
     private func handleCDP(_ json: [String: Any], _ wc: WindowController) -> String {
+        guard Self.previewPanelsEnabled else { return Self.previewsDisabledError }
         // CDP endpoint as host:port (default localhost:9222). The DevTools port grants full
         // control of the browser, so only loopback hosts are allowed — no remote targets.
         let endpoint = (json["endpoint"] as? String ?? "localhost:9222").trimmingCharacters(in: .whitespaces)

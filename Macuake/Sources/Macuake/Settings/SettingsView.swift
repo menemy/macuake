@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @AppStorage("apiAccess") private var apiAccess: String = "ask"
     @AppStorage("mcpAccess") private var mcpAccess: String = "ask"
+    @AppStorage("mcpPreviewPanels") private var mcpPreviewPanels: Bool = false
     @AppStorage("confirmOnQuit") private var confirmOnQuit: Bool = false
     @AppStorage("restoreTabsOnLaunch") private var restoreTabsOnLaunch: Bool = true
     @AppStorage("disableAnimation") private var disableAnimation: Bool = false
@@ -197,6 +198,10 @@ struct SettingsView: View {
                             .pickerStyle(.menu)
                             Spacer()
                         }
+                        Toggle("Enable preview panels (preview_file / preview_cdp)", isOn: $mcpPreviewPanels)
+                        Text("Let the API/MCP open file & browser previews in a split pane. Off by default.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         Text("MCP server changes take effect after restart.")
                             .font(.caption)
                             .foregroundColor(.secondary)
