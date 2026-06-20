@@ -33,6 +33,12 @@ RESOURCES_DIR="$APP_BUNDLE/Contents/Resources"
 mkdir -p "$RESOURCES_DIR"
 cp "$PROJECT_ROOT/Macuake/Resources/macuake.icns" "$RESOURCES_DIR/" 2>/dev/null || true
 
+echo "==> Copying markdown preview assets..."
+# Bundled marked.js + highlight.js + mermaid.js + GitHub CSS for the file-preview pane.
+# Copied directly (not via SwiftPM .process, which silently drops out-of-target resources).
+rm -rf "$RESOURCES_DIR/markdown"
+cp -R "$PROJECT_ROOT/Macuake/Resources/markdown" "$RESOURCES_DIR/markdown"
+
 echo "==> Copying resource bundles..."
 for bundle in .build/apple/Products/Release/*.bundle; do
     [ -d "$bundle" ] || continue
