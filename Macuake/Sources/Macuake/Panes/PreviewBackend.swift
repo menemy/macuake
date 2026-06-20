@@ -120,21 +120,47 @@ final class PreviewBackend: TerminalBackend {
 
     private func installMarkdown(_ url: URL) {
         let md = Self.readText(url)
-        let web = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        let cfg = WKWebViewConfiguration()
+        let ucc = cfg.userContentController
+        let web = WKWebView(frame: .zero, configuration: cfg)
         web.setValue(false, forKey: "drawsBackground")  // transparent → our dark container shows through pre-paint
         if #available(macOS 12.0, *) {
             web.underPageBackgroundColor = Self.canvasColor  // avoids white flash before first paint
         }
-        if let html = Self.markdownHTML(markdown: md) {
+
+        let html: String
+        if let rendered = Self.markdownHTML(markdown: md) {
             // Primary path: bundled marked + highlight.js + mermaid → GFM tables & diagrams.
-            web.loadHTMLString(html, baseURL: url.deletingLastPathComponent())
+            html = rendered
         } else {
             // Fallback (bundled assets missing): Ink, no tables/diagrams.
             let body = MarkdownParser().html(from: md)
-            let html = "<!doctype html><html><head><meta charset='utf-8'><style>\(Self.markdownCSS)</style></head><body class='markdown-body'>\(body)</body></html>"
-            web.loadHTMLString(html, baseURL: url.deletingLastPathComponent())
+            html = "<!doctype html><html><head><meta charset='utf-8'><style>\(Self.markdownCSS)</style></head><body class='markdown-body'>\(body)</body></html>"
+        }
+
+        // Block all internet access in the preview, THEN load (defense-in-depth with the
+        // DOMPurify sanitize: even surviving markup can't fetch/track/exfiltrate remotely).
+        let base = url.deletingLastPathComponent()
+        Self.compileNetworkBlock { rule in
+            if let rule { ucc.add(rule) }
+            web.loadHTMLString(html, baseURL: base)
         }
         install(web, focus: web)
+    }
+
+    /// Content rule blocking ALL internet protocols inside the preview WebView. Local
+    /// `file://` and inlined assets still work; remote scripts/images/trackers, fetch/XHR
+    /// and WebSockets are blocked — nothing leaves the machine.
+    private static let networkBlockRules = #"[{"trigger":{"url-filter":"^(https?|wss?|ftp)://"},"action":{"type":"block"}}]"#
+
+    private static func compileNetworkBlock(_ completion: @escaping (WKContentRuleList?) -> Void) {
+        WKContentRuleListStore.default().compileContentRuleList(
+            forIdentifier: "macuake-preview-no-internet",
+            encodedContentRuleList: networkBlockRules
+        ) { list, _ in
+            // Completion is delivered on the main queue — safe to touch the WebView.
+            completion(list)
+        }
     }
 
     private func installCode(_ url: URL) {
@@ -269,13 +295,14 @@ final class PreviewBackend: TerminalBackend {
     private static let mermaidJS = markdownAsset("mermaid.min.js")
     private static let githubMarkdownCSS = markdownAsset("github-markdown-dark.css")
     private static let hljsCSS = markdownAsset("github-dark.min.css")
+    private static let purifyJS = markdownAsset("purify.min.js")
 
     /// Build a self-contained HTML document that renders `markdown` client-side with
     /// marked (GFM tables), highlight.js (code blocks) and mermaid (diagrams).
     /// Returns nil if any bundled asset is missing (caller falls back to Ink).
     private static func markdownHTML(markdown: String) -> String? {
         guard let marked = markedJS, let hljs = hljsJS, let mermaid = mermaidJS,
-              let ghCSS = githubMarkdownCSS, let hlCSS = hljsCSS else { return nil }
+              let ghCSS = githubMarkdownCSS, let hlCSS = hljsCSS, let purify = purifyJS else { return nil }
 
         // JSON-encode the markdown so it embeds safely inside a <script> string literal.
         // JSONEncoder escapes `/` as `\/` (so `</script>` can't close the tag); also guard
@@ -303,12 +330,16 @@ final class PreviewBackend: TerminalBackend {
         <article id="content" class="markdown-body"></article>
         <script>\(marked)</script>
         <script>\(hljs)</script>
+        <script>\(purify)</script>
         <script>\(mermaid)</script>
         <script>
           (function(){
             var RAW = \(raw);
             var el = document.getElementById('content');
-            try { el.innerHTML = marked.parse(RAW); }
+            // Sanitize the rendered HTML — strips <script>, event handlers (onerror=…) and
+            // javascript: URLs from untrusted markdown. Our own scripts above are trusted
+            // (from the bundle, not the content). Network is also blocked at the WebView.
+            try { el.innerHTML = DOMPurify.sanitize(marked.parse(RAW)); }
             catch(e){ el.textContent = String(RAW); return; }
             // Promote ```mermaid fenced blocks into <div class="mermaid"> nodes.
             el.querySelectorAll('pre code.language-mermaid').forEach(function(code){
