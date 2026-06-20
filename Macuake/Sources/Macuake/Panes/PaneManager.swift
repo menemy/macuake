@@ -39,6 +39,12 @@ final class PaneManager: ObservableObject {
         rootPane.backend(for: focusedPaneID)
     }
 
+    /// Leaf IDs that are real terminal sessions — excludes preview panes (which have no
+    /// `TerminalInstance` and must never receive focus or appear as API sessions).
+    var terminalLeafIDs: [String] {
+        rootPane.leafIDs.filter { !(rootPane.backend(for: $0) is PreviewBackend) }
+    }
+
     var currentDirectory: String {
         focusedInstance?.currentDirectory ?? ""
     }
@@ -103,7 +109,8 @@ final class PaneManager: ObservableObject {
             rootPane = newRoot
             instances.removeValue(forKey: id)
             if !rootPane.leafIDs.contains(focusedPaneID) {
-                focusedPaneID = rootPane.leafIDs.first!
+                // Prefer a terminal pane; fall back to any leaf only if none remain.
+                focusedPaneID = terminalLeafIDs.first ?? rootPane.leafIDs.first!
             }
             return true
         }
@@ -151,7 +158,7 @@ final class PaneManager: ObservableObject {
     }
 
     func moveFocus(_ direction: NavigationDirection) {
-        let leaves = rootPane.leafIDs
+        let leaves = terminalLeafIDs  // never focus a preview pane
         guard leaves.count > 1, let currentIndex = leaves.firstIndex(of: focusedPaneID) else { return }
         switch direction {
         case .next:
