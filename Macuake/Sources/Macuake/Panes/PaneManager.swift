@@ -39,10 +39,11 @@ final class PaneManager: ObservableObject {
         rootPane.backend(for: focusedPaneID)
     }
 
-    /// Leaf IDs that are real terminal sessions — excludes preview panes (which have no
-    /// `TerminalInstance` and must never receive focus or appear as API sessions).
+    /// Leaf IDs that are real terminal sessions — excludes non-terminal panes (file/CDP
+    /// preview), which have no `TerminalInstance` and must never receive focus or appear
+    /// as API sessions.
     var terminalLeafIDs: [String] {
-        rootPane.leafIDs.filter { !(rootPane.backend(for: $0) is PreviewBackend) }
+        rootPane.leafIDs.filter { !(rootPane.backend(for: $0) is NonTerminalBackend) }
     }
 
     var currentDirectory: String {
@@ -91,6 +92,22 @@ final class PaneManager: ObservableObject {
         let preview = PreviewBackend(path: path)
         rootPane = splitNode(rootPane, targetID: targetID, axis: axis, newBackend: preview, newPaneID: newPaneID, ratio: ratio)
         // Intentionally do NOT move focus — a preview pane is non-interactive.
+        return true
+    }
+
+    /// Split `targetID` and place a CDP browser-preview (screencast of a Chrome tab) in the
+    /// new pane. Reuses an existing CDP pane in this tab if present. Keeps focus on the
+    /// source terminal.
+    @discardableResult
+    func addCDPSplit(targetID: String, endpoint: String, axis: Axis, ratio: CGFloat = 0.5) -> Bool {
+        if rootPane.leafIDs.contains(where: { rootPane.backend(for: $0) is CDPScreencastBackend }) {
+            // A CDP pane already exists — leave it (it mirrors whatever tab Chrome shows).
+            return true
+        }
+        guard rootPane.leafIDs.contains(targetID) else { return false }
+        let newPaneID = generateShortID()
+        let cdp = CDPScreencastBackend(endpoint: endpoint)
+        rootPane = splitNode(rootPane, targetID: targetID, axis: axis, newBackend: cdp, newPaneID: newPaneID, ratio: ratio)
         return true
     }
 

@@ -34,10 +34,10 @@ struct PaneSplitView: View {
     var body: some View {
         switch node {
         case .leaf(let id, let backend):
-            if backend is PreviewBackend {
-                // Preview panes own their interactions (scroll, etc.) — don't attach
-                // the terminal tap-gesture / context menu / hit-shape, which would
-                // steal right-click and drag from the hosted preview. Just a close ✕.
+            if backend is NonTerminalBackend {
+                // Preview / CDP panes own their interactions (scroll, click, etc.) — don't
+                // attach the terminal tap-gesture / context menu / hit-shape, which would
+                // steal right-click and drag from the hosted view. Just a close ✕.
                 leafContent(id: id, backend: backend)
                     .overlay(alignment: .topTrailing) {
                         Button {

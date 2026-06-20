@@ -463,7 +463,7 @@ final class MCPHTTPServer {
                     "session_id": .object(["type": .string("string"), "description": .string("Target session (default: focused)")])
                 ])
              ])),
-        Tool(name: "preview_file", description: "Preview a local file in a scrollable, selectable split pane beside the terminal. Renders natively by type: Markdown (GFM tables + mermaid diagrams + syntax-highlighted code), source code (syntax highlighted), PDF, images, and video/audio. Unsupported types show a placeholder. Path must be a local file the agent has written or can read.",
+        Tool(name: "preview_file", description: "Preview a local file in a scrollable, selectable split pane beside the terminal. Renders natively by type: Markdown (GFM tables + mermaid diagrams + syntax-highlighted code), source code (syntax highlighted), PDF, images, and video/audio. Unsupported types return an error and open no pane. Path must be a local file the agent has written or can read.",
              inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
@@ -473,6 +473,16 @@ final class MCPHTTPServer {
                     "ratio": .object(["type": .string("number"), "description": .string("Split ratio 0.1-0.9 for the terminal pane (default: 0.5)")])
                 ]),
                 "required": .array([.string("path")])
+             ])),
+        Tool(name: "preview_cdp", description: "Mirror a Chrome/Chromium tab (the agent's browser) live in a split pane via the DevTools screencast protocol. The browser must run with --remote-debugging-port; only loopback endpoints are allowed (tunnel remote browsers over SSH). This is a live preview — you watch and can click/scroll/type to take over; it is not a full browser.",
+             inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "endpoint": .object(["type": .string("string"), "description": .string("CDP host:port, must be loopback (default: localhost:9222)")]),
+                    "direction": .object(["type": .string("string"), "description": .string("Split direction: h (side-by-side, default) or v (top/bottom)")]),
+                    "session_id": .object(["type": .string("string"), "description": .string("Terminal session to split (default: focused)")]),
+                    "ratio": .object(["type": .string("number"), "description": .string("Split ratio 0.1-0.9 for the terminal pane (default: 0.5)")])
+                ])
              ])),
         Tool(name: "set_appearance", description: "Set tab title (by tab_id, session_id, or active tab)",
              inputSchema: .object([
@@ -532,7 +542,7 @@ final class MCPHTTPServer {
             "execute": "execute", "read": "read", "paste": "paste",
             "control_char": "control-char", "clear": "clear", "split": "split",
             "resize_split": "resize-split", "preview_file": "preview-file",
-            "set_appearance": "set-appearance",
+            "preview_cdp": "preview-cdp", "set_appearance": "set-appearance",
         ]
 
         guard let action = actionMap[params.name] else {
