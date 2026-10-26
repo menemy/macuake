@@ -37,7 +37,7 @@ struct KeyboardBeepTests {
             // Path 1: Non-printable
             if markedTextStorage.length == 0 {
                 let chars = event.characters ?? ""
-                let isNonPrintable = chars.isEmpty || chars.unicodeScalars.allSatisfy {
+                let isNonPrintable = !chars.isEmpty && chars.unicodeScalars.allSatisfy {
                     $0.value < 0x20 || $0.value == 0x7F ||
                     ($0.value >= 0xF700 && $0.value <= 0xF8FF)
                 }
@@ -240,6 +240,17 @@ struct KeyboardBeepTests {
         #expect(view.keyPaths == ["ime:0"])
         // insertText should be called by interpretKeyEvents for regular text
         #expect(view.insertTextCalls.contains("a"))
+    }
+
+    @Test func deadKey_emptyChars_takesIMEPath() {
+        // Dead keys (´ on Spanish layout, Option+E/N on US/French) arrive with empty characters
+        // and must reach interpretKeyEvents so they can compose with the next key.
+        let (_, view) = makeWindowAndView()
+        let event = makeKeyEvent(keyCode: 33, characters: "", charactersIgnoringModifiers: "")
+        view.keyDown(with: event)
+
+        #expect(view.keyPaths == ["ime:33"])
+        #expect(view.doCommandCalls.isEmpty, "Dead key should not trigger doCommand (no beep)")
     }
 
     @Test func regularText_doCommand_doesNotBeep() {

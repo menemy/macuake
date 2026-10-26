@@ -30,7 +30,7 @@ struct KeyboardRoutingTests {
         override func keyDown(with event: NSEvent) {
             if marked.length == 0 {
                 let chars = event.characters ?? ""
-                let isNonPrintable = chars.isEmpty || chars.unicodeScalars.allSatisfy {
+                let isNonPrintable = !chars.isEmpty && chars.unicodeScalars.allSatisfy {
                     $0.value < 0x20 || $0.value == 0x7F ||
                     ($0.value >= 0xF700 && $0.value <= 0xF8FF)
                 }
@@ -95,6 +95,14 @@ struct KeyboardRoutingTests {
         #expect(v.doCommands.isEmpty, "No interpretKeyEvents for control chars")
     }
 
+    @Test func deadKey_emptyChars_takesIME() {
+        let (_, v) = setup()
+        // Dead keys (´ on Spanish layout, Option+N on French) arrive with empty characters
+        // and must reach interpretKeyEvents so they can compose with the next key.
+        v.keyDown(with: key(33, ""))
+        #expect(v.paths == ["ime:33"])
+    }
+
     @Test func del_0x7F_takesDirect() {
         let (_, v) = setup()
         v.keyDown(with: key(51, "\u{7F}"))
@@ -147,12 +155,6 @@ struct KeyboardRoutingTests {
         v.keyDown(with: key(53, "\u{1B}")) // Escape
         v.keyDown(with: key(36, "\r"))     // Return
         #expect(v.paths == ["direct:48", "direct:53", "direct:36"])
-    }
-
-    @Test func emptyChars_takesDirect() {
-        let (_, v) = setup()
-        v.keyDown(with: key(0, ""))
-        #expect(v.paths == ["direct:0"])
     }
 
     // MARK: - Path 2: Printable → IME

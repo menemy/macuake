@@ -165,9 +165,11 @@ final class GhosttyTerminalView: NSView {
 
         // Path 1: Non-printable keys (backspace, arrows, tab, escape, return, F-keys)
         // Bypass interpretKeyEvents to avoid NSBeep on rapid input.
+        // Empty characters means a dead key (e.g. ´ ` ¨ ^ ~ on Spanish/French layouts):
+        // it must go through interpretKeyEvents so the input system can compose it.
         if markedTextStorage.length == 0 {
             let chars = event.characters ?? ""
-            let isNonPrintable = chars.isEmpty || chars.unicodeScalars.allSatisfy {
+            let isNonPrintable = !chars.isEmpty && chars.unicodeScalars.allSatisfy {
                 $0.value < 0x20 || $0.value == 0x7F ||
                 ($0.value >= 0xF700 && $0.value <= 0xF8FF)
             }
