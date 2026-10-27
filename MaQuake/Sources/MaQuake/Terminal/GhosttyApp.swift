@@ -102,16 +102,20 @@ final class GhosttyApp: @unchecked Sendable {
             return GhosttyApp.shared.handleAction(target: target, action: action)
         }
 
-        runtimeConfig.read_clipboard_cb = { _, _, state in
-            let contents = NSPasteboard.general.string(forType: .string) ?? ""
-            GhosttyApp.shared.completeClipboardRead(contents: contents, state: state)
-            return true
+        runtimeConfig.read_clipboard_cb = { userdata, _, state in
+            guard let contents = NSPasteboard.general.string(forType: .string) else { return false }
+            return GhosttyApp.shared.completeClipboardRead(
+                userdata: userdata, contents: contents, state: state
+            )
         }
 
-        runtimeConfig.confirm_read_clipboard_cb = { _, _, state, _ in
-            // Auto-confirm clipboard reads
-            let contents = NSPasteboard.general.string(forType: .string) ?? ""
-            GhosttyApp.shared.completeClipboardRead(contents: contents, state: state)
+        runtimeConfig.confirm_read_clipboard_cb = { userdata, contents, state, _ in
+            guard let contents else { return }
+            // Complete the original request as confirmed. Sending false here
+            // requests confirmation again, recursively, until the stack overflows.
+            _ = GhosttyApp.shared.completeClipboardRead(
+                userdata: userdata, contents: String(cString: contents), state: state, confirmed: true
+            )
         }
 
         runtimeConfig.write_clipboard_cb = {
@@ -191,7 +195,7 @@ final class GhosttyApp: @unchecked Sendable {
 
     // MARK: - Clipboard
 
-    /// Registry of active backends for clipboard routing (protected by lock for thread safety)
+    /// Registry of active backends for config reloads (protected by lock for thread safety)
     private let backendsLock = NSLock()
     private var _activeBackends: [ObjectIdentifier: GhosttyBackend] = [:]
 
@@ -214,23 +218,21 @@ final class GhosttyApp: @unchecked Sendable {
         return copy
     }
 
-    private func completeClipboardRead(contents: String, state: UnsafeMutableRawPointer?) {
-        // Find the focused surface: check all windows for a GhosttyTerminalView first responder.
-        let focusedSurface: ghostty_surface_t? = {
-            for window in NSApp.windows {
-                if let fr = window.firstResponder as? GhosttyTerminalView,
-                   let surface = fr.backend?.surface {
-                    return surface
-                }
-            }
-            // Fallback: first registered backend
-            return activeBackends.values.first(where: { $0.surface != nil })?.surface
-        }()
-
-        guard let surface = focusedSurface else { return }
+    private func completeClipboardRead(
+        userdata: UnsafeMutableRawPointer?,
+        contents: String,
+        state: UnsafeMutableRawPointer?,
+        confirmed: Bool = false
+    ) -> Bool {
+        // Clipboard callbacks receive the requesting surface's userdata.
+        // Focus may belong to another tab or window and cannot identify the owner.
+        guard let userdata else { return false }
+        let backend = Unmanaged<GhosttyBackend>.fromOpaque(userdata).takeUnretainedValue()
+        guard let surface = backend.surface else { return false }
         contents.withCString { ptr in
-            ghostty_surface_complete_clipboard_request(surface, ptr, state, false)
+            ghostty_surface_complete_clipboard_request(surface, ptr, state, confirmed)
         }
+        return true
     }
 
     // MARK: - Action routing

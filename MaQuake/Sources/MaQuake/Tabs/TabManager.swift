@@ -123,6 +123,8 @@ final class TabManager: ObservableObject {
         } else if activeTabIndex >= tabs.count {
             activeTabIndex = tabs.count - 1
         }
+
+        focusTerminalInActiveTab()
     }
 
     func reopenClosedTab() {
@@ -238,6 +240,13 @@ final class TabManager: ObservableObject {
         guard let tab = activeTab, let pm = tab.paneManager,
               let backend = pm.focusedBackend else { return }
         let termView = backend.focusableView
+
+        // Existing terminal views can take focus immediately. Newly added SwiftUI
+        // views are not attached to a window until the next main-loop turn.
+        if termView.window?.makeFirstResponder(termView) == true {
+            return
+        }
+
         DispatchQueue.main.async {
             termView.window?.makeFirstResponder(termView)
         }

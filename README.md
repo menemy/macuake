@@ -40,6 +40,13 @@ cd macuake
 swift build                   # debug build
 ```
 
+For a signed local release bundle, use:
+
+```bash
+./scripts/build-install.sh           # creates build/Macuake.app
+./scripts/build-install.sh --install # also installs /Applications/Macuake_dev.app
+```
+
 ## Usage
 
 Launch macuake — it lives in the menu bar (no Dock icon). Press `Option+Space` to toggle.

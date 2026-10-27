@@ -58,6 +58,30 @@ struct TabManagerTests {
         #expect(manager.tabs.count == 1)
     }
 
+    @Test func closeTab_focusesTerminalInNewlyActiveTab() {
+        let manager = TabManager()
+        manager.addTab()
+
+        let remainingTerminal = manager.tabs[0].paneManager!.focusedBackend!.focusableView
+        let closingTerminal = manager.tabs[1].paneManager!.focusedBackend!.focusableView
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        let contentView = NSView(frame: window.contentRect(forFrameRect: window.frame))
+        contentView.addSubview(remainingTerminal)
+        contentView.addSubview(closingTerminal)
+        window.contentView = contentView
+
+        #expect(window.makeFirstResponder(closingTerminal))
+        manager.closeTab(id: manager.tabs[1].id)
+
+        RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        #expect(window.firstResponder === remainingTerminal)
+    }
+
     @Test func closeTab_lastTab_addsNewTab() {
         let manager = TabManager()
         #expect(manager.tabs.count == 1)
