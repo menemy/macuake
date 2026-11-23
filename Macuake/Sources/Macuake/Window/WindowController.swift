@@ -31,6 +31,15 @@ final class WindowController: ObservableObject {
     // Debounce: ignore resign/appSwitch hide triggers briefly after show()
     private var showTimestamp: Date = .distantPast
 
+    // Suppress auto-hide while switching Dock activation policy (which deactivates the app)
+    private var isChangingActivationPolicy = false
+
+    // Set when the panel is hidden because focus left it (resign / app switch /
+    // outside click). Lets applicationShouldHandleReopen tell a Dock click that
+    // hid the panel apart from one that should re-open it.
+    private var defocusHidePending = false
+    private var defocusHideGeneration = 0
+
     // Scroll wheel state for tab switching
     private var scrollAccumulator: CGFloat = 0
     private var lastScrollTime: Date = .distantPast
@@ -128,6 +137,50 @@ final class WindowController: ObservableObject {
         panelWidth = screen.width
     }
 
+    /// Apply the "Show icon in Dock" setting. Switching activation policy
+    /// deactivates the app, which would otherwise trip the auto-hide observers and
+    /// collapse the panel — suppress that, and keep the panel up if it was visible.
+    func applyDockIconPolicy() {
+        let show = UserDefaults.standard.bool(forKey: DockIconPolicy.key)
+        let wasVisible = (state == .visible)
+        isChangingActivationPolicy = true
+        NSApp.setActivationPolicy(show ? .regular : .accessory)
+        if wasVisible {
+            showTimestamp = Date()
+            panel.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            self?.isChangingActivationPolicy = false
+        }
+    }
+
+    /// Hide because focus left the panel (resign / app switch / outside click).
+    /// Flags the hide so a Dock-icon click that caused it isn't immediately
+    /// re-opened by applicationShouldHandleReopen; the flag clears next run-loop.
+    func performDefocusHide() {
+        defocusHidePending = true
+        // Clear only after the Dock reopen has had its chance to consume the flag.
+        // (Diagnostics showed reopen fires on a *later* run-loop than this hide, so
+        // clearing on the next tick was too early.) Generation-guarded so a newer
+        // defocus-hide isn't cleared by an older timer. Only matters for the
+        // click-away-elsewhere case where no reopen follows.
+        defocusHideGeneration += 1
+        let gen = defocusHideGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            guard let self, self.defocusHideGeneration == gen else { return }
+            self.defocusHidePending = false
+        }
+        hide()
+    }
+
+    /// True (and clears the flag) if the panel was just hidden by a defocus this
+    /// event cycle — a Dock click that caused it should not re-open the panel.
+    func consumeDefocusHide() -> Bool {
+        defer { defocusHidePending = false }
+        return defocusHidePending
+    }
+
     // MARK: - Observers
 
     private func setupObservers() {
@@ -138,9 +191,10 @@ final class WindowController: ObservableObject {
         ) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
+                guard !self.isChangingActivationPolicy else { return }
                 guard Date().timeIntervalSince(self.showTimestamp) > 0.3 else { return }
                 if self.state == .visible && !self.isPinned {
-                    self.hide()
+                    self.performDefocusHide()
                 }
             }
         }
@@ -153,6 +207,7 @@ final class WindowController: ObservableObject {
             guard let self else { return }
             guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
             Task { @MainActor in
+                guard !self.isChangingActivationPolicy else { return }
                 guard Date().timeIntervalSince(self.showTimestamp) > 0.3 else { return }
                 if app.bundleIdentifier != Bundle.main.bundleIdentifier,
                    self.state == .visible {
@@ -160,7 +215,7 @@ final class WindowController: ObservableObject {
                         // Pinned: stay visible but release keyboard focus
                         self.panel.resignKey()
                     } else {
-                        self.hide()
+                        self.performDefocusHide()
                     }
                 }
             }
@@ -322,7 +377,7 @@ final class WindowController: ObservableObject {
             guard let self else { return }
             Task { @MainActor in
                 if self.state == .visible && !self.isPinned {
-                    self.hide()
+                    self.performDefocusHide()
                 }
             }
         }
@@ -356,8 +411,9 @@ final class WindowController: ObservableObject {
             let tabBarTop = screen.frame.maxY - menuBarHeight
             let tabBarBottom = tabBarTop - 36
 
-            guard mouse.y >= tabBarBottom && mouse.y <= tabBarTop
-                    && mouse.x >= termX && mouse.x <= termX + termWidth else {
+            let inTabBar = mouse.y >= tabBarBottom && mouse.y <= tabBarTop
+                    && mouse.x >= termX && mouse.x <= termX + termWidth
+            guard inTabBar else {
                 return event
             }
 

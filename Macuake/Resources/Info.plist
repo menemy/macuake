@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>maquake</string>
+    <string>macuake</string>
     <key>CFBundleIdentifier</key>
     <string>com.maquake.app</string>
     <key>CFBundleVersion</key>
@@ -13,7 +13,7 @@
     <key>LSUIElement</key>
     <true/>
     <key>CFBundleIconFile</key>
-    <string>maquake</string>
+    <string>macuake</string>
     <key>SUFeedURL</key>
     <string>https://github.com/menemy/macuake/releases/latest/download/appcast.xml</string>
     <key>SUPublicEDKey</key>

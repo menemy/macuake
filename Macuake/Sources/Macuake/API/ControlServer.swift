@@ -12,13 +12,21 @@ final class ControlServer {
     private var readSource: DispatchSourceRead?
     private weak var windowController: WindowController?
     /// Serial queue ensures requests are processed one at a time.
-    private let requestQueue = DispatchQueue(label: "com.macuake.api")
+    private let requestQueue = DispatchQueue(label: "com.maquake.app.api")
 
     /// API access: "ask" = prompt on first request, "enabled", "disabled"
     @MainActor static var accessState: String {
         get { UserDefaults.standard.string(forKey: "apiAccess") ?? "ask" }
         set { UserDefaults.standard.set(newValue, forKey: "apiAccess") }
     }
+
+    /// Whether preview panels (preview_file / preview_cdp) may be opened via API/MCP.
+    /// Off by default — the user opts in via Settings → API.
+    static var previewPanelsEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "mcpPreviewPanels")
+    }
+
+    static let previewsDisabledError = jsonError("preview panels are disabled — enable them in Settings → API (\"Enable preview panels\")")
 
     init(windowController: WindowController, socketPath: String = "/tmp/macuake.sock", startImmediately: Bool = true) {
         self.socketPath = socketPath
@@ -199,6 +207,8 @@ final class ControlServer {
         case "clear":         return handleClear(json, wc)
         case "split":         return handleSplit(json, wc)
         case "resize-split":  return handleResizeSplit(json, wc)
+        case "preview-file":  return handlePreviewFile(json, wc)
+        case "preview-cdp":   return handleCDP(json, wc)
         case "set-appearance": return handleSetAppearance(json, wc)
         default:              return jsonError("unknown action: \(action)")
         }
@@ -217,7 +227,8 @@ final class ControlServer {
                 "active": i == wc.tabManager.activeTabIndex,
             ]
             if let pm = tab.paneManager {
-                let sessions = pm.rootPane.leafIDs.map { sid -> [String: Any] in
+                // Only real terminal sessions — preview panes are not sessions.
+                let sessions = pm.terminalLeafIDs.map { sid -> [String: Any] in
                     let inst = pm.instance(for: sid)
                     return [
                         "session_id": sid,
@@ -453,6 +464,92 @@ final class ControlServer {
             return jsonError("split failed")
         }
         return jsonOK(["session_id": pm.focusedPaneID])
+    }
+
+    @MainActor
+    private func handlePreviewFile(_ json: [String: Any], _ wc: WindowController) -> String {
+        guard Self.previewPanelsEnabled else { return Self.previewsDisabledError }
+        guard let path = json["path"] as? String, !path.isEmpty else {
+            return jsonError("missing path")
+        }
+        let expanded = (path as NSString).expandingTildeInPath
+        guard FileManager.default.fileExists(atPath: expanded) else {
+            return jsonError("file not found: \(expanded)")
+        }
+        // Unsupported types open NO pane — just report back to the caller (API/MCP).
+        guard PreviewBackend.isSupported(path: expanded) else {
+            let ext = (expanded as NSString).pathExtension
+            return jsonError("cannot preview .\(ext) — supported: markdown, source code, PDF, images, audio/video")
+        }
+        let direction = json["direction"] as? String ?? "h"
+        guard direction == "h" || direction == "v" else {
+            return jsonError("direction must be \"h\" or \"v\"")
+        }
+        let axis: Axis = direction == "h" ? .horizontal : .vertical
+        let ratio = CGFloat(json["ratio"] as? Double ?? 0.5)
+
+        // Target a specific session, else the focused pane in the active tab.
+        let pm: PaneManager
+        let targetID: String
+        if let sid = json["session_id"] as? String {
+            guard let (_, _, foundPM) = findSession(sid, wc) else {
+                return jsonError("session not found: \(sid)")
+            }
+            pm = foundPM
+            targetID = sid
+        } else {
+            guard let tab = wc.tabManager.activeTab, let activePM = tab.paneManager else {
+                return jsonError("no active terminal tab")
+            }
+            pm = activePM
+            targetID = activePM.focusedPaneID
+        }
+
+        guard pm.addPreviewSplit(targetID: targetID, path: expanded, axis: axis, ratio: ratio) else {
+            return jsonError("preview failed")
+        }
+        return jsonOK(["preview_path": expanded])
+    }
+
+    @MainActor
+    private func handleCDP(_ json: [String: Any], _ wc: WindowController) -> String {
+        guard Self.previewPanelsEnabled else { return Self.previewsDisabledError }
+        // CDP endpoint as host:port (default localhost:9222). The DevTools port grants full
+        // control of the browser, so only loopback hosts are allowed — no remote targets.
+        let endpoint = (json["endpoint"] as? String ?? "localhost:9222").trimmingCharacters(in: .whitespaces)
+        let host = endpoint.contains(":") ? String(endpoint[..<endpoint.lastIndex(of: ":")!]) : endpoint
+        let loopback: Set<String> = ["localhost", "127.0.0.1", "::1", "[::1]", ""]
+        guard loopback.contains(host) else {
+            return jsonError("endpoint must be loopback (localhost / 127.0.0.1); got \"\(host)\". Tunnel remote browsers over SSH to localhost.")
+        }
+
+        let direction = json["direction"] as? String ?? "h"
+        guard direction == "h" || direction == "v" else {
+            return jsonError("direction must be \"h\" or \"v\"")
+        }
+        let axis: Axis = direction == "h" ? .horizontal : .vertical
+        let ratio = CGFloat(json["ratio"] as? Double ?? 0.5)
+
+        let pm: PaneManager
+        let targetID: String
+        if let sid = json["session_id"] as? String {
+            guard let (_, _, foundPM) = findSession(sid, wc) else {
+                return jsonError("session not found: \(sid)")
+            }
+            pm = foundPM
+            targetID = sid
+        } else {
+            guard let tab = wc.tabManager.activeTab, let activePM = tab.paneManager else {
+                return jsonError("no active terminal tab")
+            }
+            pm = activePM
+            targetID = activePM.focusedPaneID
+        }
+
+        guard pm.addCDPSplit(targetID: targetID, endpoint: endpoint, axis: axis, ratio: ratio) else {
+            return jsonError("cdp preview failed")
+        }
+        return jsonOK(["endpoint": endpoint])
     }
 
     @MainActor

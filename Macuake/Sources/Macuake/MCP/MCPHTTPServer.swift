@@ -32,6 +32,7 @@ final class MCPHTTPServer {
         let server = Server(
             name: "macuake",
             version: version,
+            instructions: Self.serverInstructions,
             capabilities: .init(tools: .init(listChanged: false))
         )
         self.mcpServer = server
@@ -212,8 +213,16 @@ final class MCPHTTPServer {
             )
 
             Task { @MainActor in
-                guard let transport = server?.transport else {
+                guard let server, let transport = server.transport else {
                     connection.cancel()
+                    return
+                }
+                // Defense against DNS-rebinding / browser cross-origin: require a
+                // loopback Host and (if present) a loopback Origin. A site that
+                // rebinds its DNS to 127.0.0.1 still sends its own hostname as Host.
+                guard server.isLocalRequest(headers: parsed.headers) else {
+                    print("MCPHTTPServer: rejected request with non-local Host/Origin")
+                    sendForbidden(on: connection)
                     return
                 }
                 let response = await transport.handleRequest(httpRequest)
@@ -227,6 +236,38 @@ final class MCPHTTPServer {
                 sendHTTPResponse(response, on: connection)
             }
         }
+    }
+
+    // MARK: - Request origin validation
+
+    /// True if the request's Host (and Origin, if present) are loopback. Defeats
+    /// DNS-rebinding and browser cross-origin POSTs to the local MCP port — a
+    /// rebound site connects from 127.0.0.1 but still carries its own Host header.
+    func isLocalRequest(headers: [String: String]) -> Bool {
+        func header(_ name: String) -> String? {
+            headers.first { $0.key.lowercased() == name }?.value.lowercased()
+        }
+        let hosts: Set<String> = [
+            "localhost:\(port)", "127.0.0.1:\(port)", "[::1]:\(port)",
+            "localhost", "127.0.0.1", "[::1]",
+        ]
+        guard let host = header("host"), hosts.contains(host) else { return false }
+        if let origin = header("origin") {
+            let origins: Set<String> = [
+                "http://localhost:\(port)", "http://127.0.0.1:\(port)", "http://[::1]:\(port)",
+                "https://localhost:\(port)", "https://127.0.0.1:\(port)",
+            ]
+            if !origins.contains(origin) { return false }
+        }
+        return true
+    }
+
+    private nonisolated static func sendForbidden(on connection: NWConnection) {
+        let body = "{\"error\":\"Forbidden\"}"
+        let resp = "HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
+        connection.send(content: resp.data(using: .utf8), completion: .contentProcessed { _ in
+            connection.cancel()
+        })
     }
 
     // MARK: - Minimal HTTP parser (nonisolated)
@@ -314,6 +355,34 @@ final class MCPHTTPServer {
     }
 
     // MARK: - Tool definitions
+
+    /// Server-level overview sent to the client on connect — what macuake is and how the
+    /// tools fit together, so the agent picks the right one.
+    nonisolated static let serverInstructions = """
+    macuake is a Quake-style drop-down terminal for macOS that the user sees on screen. \
+    These tools let you drive that VISIBLE terminal as a sidecar: run commands the user \
+    watches, read their output, and show files or a live browser beside the terminal.
+
+    Typical flow: `list` to see tabs/sessions (each has an 8-char session_id) → `new_tab` to \
+    open one → `execute` to run a command → `read` to get its output. Omit session_id to \
+    target the focused pane.
+
+    - Run/observe: execute, read, paste, control_char, clear.
+    - Window & layout: show / hide / toggle / pin / unpin; new_tab, split, focus, \
+      resize_split, close_session, set_appearance; state, list.
+    - preview_file: open a local file (markdown, source code, PDF, image, audio/video) in a \
+      scrollable, selectable split pane beside the terminal.
+    - preview_cdp: mirror a Chrome tab live in a split pane via the DevTools screencast \
+      (loopback only) — watch the browser and click/scroll/type to take over. If no debuggable \
+      Chrome is running, start one with --remote-debugging-port first (see the tool's description).
+
+    Be proactive: when you produce a file the user would want to see (report, diff, chart, \
+    generated image, PDF) call preview_file to show it; when you drive a browser, call \
+    preview_cdp so the user can watch.
+
+    Commands run in real shells the user shares — prefer non-destructive actions and let the \
+    user see what you do.
+    """
 
     nonisolated static let allTools: [Tool] = [
         Tool(name: "state", description: "Get terminal state (visible, pinned, tab count, active session)",
@@ -423,6 +492,27 @@ final class MCPHTTPServer {
                     "session_id": .object(["type": .string("string"), "description": .string("Target session (default: focused)")])
                 ])
              ])),
+        Tool(name: "preview_file", description: "Show a local file to the user in a scrollable, selectable split pane beside the terminal. Use it to surface something you produced or inspected — a report, diff, chart, generated image, screenshot, PDF, etc. Renders natively by type: Markdown .md/.markdown (GFM tables + mermaid diagrams + highlighted code), source code & text (.swift/.py/.js/.ts/.go/.rs/.json/.yaml/.sql/.sh/.diff and many more — syntax highlighted), PDF (.pdf), images (.png/.jpg/.gif/.webp/.svg…), audio/video (.mp4/.mov/.mp3…). Unsupported types return an error and open no pane (nothing is shown). Path must be a local file you wrote or can read.",
+             inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "path": .object(["type": .string("string"), "description": .string("Local file path to preview")]),
+                    "direction": .object(["type": .string("string"), "description": .string("Split direction: h (side-by-side, default) or v (top/bottom)")]),
+                    "session_id": .object(["type": .string("string"), "description": .string("Terminal session to split (default: focused)")]),
+                    "ratio": .object(["type": .string("number"), "description": .string("Split ratio 0.1-0.9 for the terminal pane (default: 0.5)")])
+                ]),
+                "required": .array([.string("path")])
+             ])),
+        Tool(name: "preview_cdp", description: "Mirror a Chrome/Chromium tab live in a split pane (DevTools screencast) so the user sees the browser; you can also click/scroll/type to take over. Use it to show browser automation, a rendered web page, or an agent-driven browsing session. PREREQUISITE: a Chromium browser running with remote debugging on a loopback port. If none is running, start a dedicated instance yourself via the execute tool, e.g. on macOS: open -na \"Google Chrome\" --args --remote-debugging-port=9222 --user-data-dir=/tmp/macuake-cdp — then drive it (Playwright/Puppeteer/manual) and call preview_cdp. Loopback endpoints only (default localhost:9222); tunnel remote browsers over SSH. The pane follows the active tab. Not a full browser — for local video files use preview_file.",
+             inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "endpoint": .object(["type": .string("string"), "description": .string("CDP host:port, must be loopback (default: localhost:9222)")]),
+                    "direction": .object(["type": .string("string"), "description": .string("Split direction: h (side-by-side, default) or v (top/bottom)")]),
+                    "session_id": .object(["type": .string("string"), "description": .string("Terminal session to split (default: focused)")]),
+                    "ratio": .object(["type": .string("number"), "description": .string("Split ratio 0.1-0.9 for the terminal pane (default: 0.5)")])
+                ])
+             ])),
         Tool(name: "set_appearance", description: "Set tab title (by tab_id, session_id, or active tab)",
              inputSchema: .object([
                 "type": .string("object"),
@@ -480,7 +570,8 @@ final class MCPHTTPServer {
             "new_tab": "new-tab", "focus": "focus", "close_session": "close-session",
             "execute": "execute", "read": "read", "paste": "paste",
             "control_char": "control-char", "clear": "clear", "split": "split",
-            "resize_split": "resize-split", "set_appearance": "set-appearance",
+            "resize_split": "resize-split", "preview_file": "preview-file",
+            "preview_cdp": "preview-cdp", "set_appearance": "set-appearance",
         ]
 
         guard let action = actionMap[params.name] else {

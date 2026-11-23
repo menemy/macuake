@@ -12,7 +12,7 @@ final class TerminalUITests: MacuakeUITestCase {
     override class func setUp() {
         super.setUp()
         // Launch once for the entire suite
-        let app = XCUIApplication(bundleIdentifier: "com.macuake.terminal")
+        let app = XCUIApplication(bundleIdentifier: "com.maquake.app")
         app.terminate()
         sleep(1)
         app.launch()
@@ -22,7 +22,7 @@ final class TerminalUITests: MacuakeUITestCase {
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
-        app = XCUIApplication(bundleIdentifier: "com.macuake.terminal")
+        app = XCUIApplication(bundleIdentifier: "com.maquake.app")
         // Ctrl+C to cancel anything running, then clear
         app.typeKey("c", modifierFlags: .control)
         Thread.sleep(forTimeInterval: 0.2)

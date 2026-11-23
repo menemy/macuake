@@ -49,7 +49,7 @@ SUITES=(
     PinnedWindowVisibilityTests
     TabManagerTerminalIntegrationTests
     WindowControllerTabManagerIntegrationTests
-    MaquakeE2ETests
+    MacuakeE2ETests
 )
 
 PASSED=0
